@@ -6,33 +6,15 @@ import { CalendarDays, Users, Shield } from "lucide-react"
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <CalendarDays className="h-8 w-8 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">RoomReserve</h1>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Link href="/login">
-              <Button variant="outline">Login</Button>
-            </Link>
-            <Link href="/register">
-              <Button>Get Started</Button>
-            </Link>
-          </div>
-        </div>
-      </header>
 
       {/* Hero Section */}
       <section className="py-20 px-4">
         <div className="container mx-auto text-center">
           <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-6 text-balance">
-            Streamline Your Office Space Management
+            Streamline Your Hotel Management
           </h2>
           <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto text-pretty">
-            Effortlessly book meeting rooms, manage schedules, and optimize your workspace with our comprehensive room
-            reservation system.
+            Effortlessly book hotelrooms, manage schedules, and optimize your hotel processes with our comprehensive hotel management system.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/register">
@@ -40,9 +22,9 @@ export default function HomePage() {
                 Start Booking Rooms
               </Button>
             </Link>
-            <Link href="/rooms">
+            <Link href="/login">
               <Button variant="outline" size="lg" className="w-full sm:w-auto bg-transparent">
-                View Available Rooms
+                View available rooms now
               </Button>
             </Link>
           </div>
@@ -53,14 +35,14 @@ export default function HomePage() {
       <section className="py-16 px-4 bg-muted/50">
         <div className="container mx-auto">
           <h3 className="text-3xl font-bold text-center text-foreground mb-12">
-            Everything You Need for Room Management
+            Everything You Need for Hotel Management
           </h3>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
             <Card>
               <CardHeader>
                 <CalendarDays className="h-12 w-12 text-primary mb-4" />
                 <CardTitle>Easy Booking</CardTitle>
-                <CardDescription>Book rooms instantly with our intuitive calendar interface</CardDescription>
+                <CardDescription>Book rooms instantly with our intuitive interface</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
@@ -73,11 +55,11 @@ export default function HomePage() {
               <CardHeader>
                 <Users className="h-12 w-12 text-primary mb-4" />
                 <CardTitle>Team Management</CardTitle>
-                <CardDescription>Manage user access and permissions efficiently</CardDescription>
+                <CardDescription>Manage your team and their schedules</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Control who can book rooms, set approval workflows, and manage team schedules.
+                  Control who can book rooms, set approval workflows, and assign rapid tasks.
                 </p>
               </CardContent>
             </Card>
@@ -90,7 +72,7 @@ export default function HomePage() {
               </CardHeader>
               <CardContent>
                 <p className="text-muted-foreground">
-                  Track usage patterns, generate reports, and optimize your office space allocation.
+                  Track usage patterns, generate reports, and optimize your hotel space allocation.
                 </p>
               </CardContent>
             </Card>
@@ -101,7 +83,7 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="border-t border-border bg-card py-8 px-4">
         <div className="container mx-auto text-center">
-          <p className="text-muted-foreground">© 2024 RoomReserve. Built for modern office management.</p>
+          <p className="text-muted-foreground">© 2025 MyBooking. Built for modern hotel management.</p>
         </div>
       </footer>
     </div>

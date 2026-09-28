@@ -760,11 +760,14 @@ export interface EmployeeTrainingAssignment {
   id: number
   employeeId: number
   employeeName: string
+  employeeEmail: string
   trainingId: number
   trainingTitle: string
+  trainingStartDate: string
+  trainingEndDate: string
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
-  assignedDate: string
-  completionDate?: string
+  assignedAt: string
+  completedAt?: string
   createdAt: string
   updatedAt: string
 }
@@ -937,6 +940,8 @@ export interface CalendarEvent {
   canReply?: boolean
   replies?: TaskReply[]
   date?: string
+  startDate?: string // For training date ranges
+  endDate?: string   // For training date ranges
 }
 
 export interface TaskReply {
@@ -1266,10 +1271,10 @@ export const employeeDashboardApi = {
       // Add trainings
       if (trainingsResponse.content) {
         trainingsResponse.content.forEach(training => {
-          // Use assignedAt as the training date, fallback to current date if not available
-          const trainingDate = training.assignedAt ? 
-            new Date(training.assignedAt).toISOString().split('T')[0] : 
-            new Date().toISOString().split('T')[0]
+          // Use training start date for the calendar event
+          const trainingStartDate = training.trainingStartDate ? 
+            new Date(training.trainingStartDate).toISOString().split('T')[0] : 
+            (training.assignedAt ? new Date(training.assignedAt).toISOString().split('T')[0] : new Date().toISOString().split('T')[0])
           
           events.push({
             id: `training-${training.id}`,
@@ -1277,9 +1282,11 @@ export const employeeDashboardApi = {
             type: "training",
             startTime: "All Day",
             endTime: "All Day",
-            description: "Training session",
+            description: `Training: ${training.trainingStartDate ? new Date(training.trainingStartDate).toLocaleDateString() : 'TBD'} - ${training.trainingEndDate ? new Date(training.trainingEndDate).toLocaleDateString() : 'TBD'}`,
             status: training.status === "COMPLETED" ? "completed" : "in-progress",
-            date: trainingDate
+            date: trainingStartDate,
+            startDate: training.trainingStartDate ? new Date(training.trainingStartDate).toISOString().split('T')[0] : undefined,
+            endDate: training.trainingEndDate ? new Date(training.trainingEndDate).toISOString().split('T')[0] : undefined
           })
         })
       }

@@ -17,7 +17,7 @@ import {
   Shield
 } from 'lucide-react'
 import { COMPONENT_TEMPLATES } from '@/lib/style-constants'
-import { apiClient, API_ENDPOINTS, User as UserType, loyaltyApi } from '@/lib/api'
+import { apiClient, API_ENDPOINTS, User as UserType, loyaltyApi, authApi } from '@/lib/api'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8080/api"
 
@@ -58,37 +58,22 @@ export function UserManagement() {
   const fetchUsers = async () => {
     try {
       setLoading(true)
-      // Use loyalty API to get user data (since it contains user information)
-      const response = await loyaltyApi.getAllAccounts()
-      const loyaltyAccounts = response.content || []
+      // Use auth API to get all users data
+      const allUsers = await authApi.getAllUsers()
       
-      // Transform loyalty accounts to user format
-      const transformedUsers: UserType[] = loyaltyAccounts.map((account: any) => ({
-        id: account.userId,
-        firstName: account.userName.split(' ')[0] || 'Unknown',
-        lastName: account.userName.split(' ')[1] || 'User',
-        email: account.userEmail,
-        phone: '+1 (555) 000-0000', // Placeholder
-        address: '123 Client Street, Client City, CC 12347', // Placeholder
-        birthDate: '1990-01-01', // Placeholder
-        role: 'CLIENT',
-        createdAt: account.createdAt,
-        updatedAt: account.updatedAt
+      // Transform users to the expected format
+      const transformedUsers: UserType[] = allUsers.map((user: any) => ({
+        id: user.id,
+        firstName: user.firstName || 'Unknown',
+        lastName: user.lastName || 'User',
+        email: user.email,
+        phone: user.phone || '+1 (555) 000-0000',
+        address: user.address || '123 User Street, User City, UC 12345',
+        birthDate: user.birthDate || '1990-01-01',
+        role: user.role,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt
       }))
-      
-      // Add admin user
-      transformedUsers.push({
-        id: 1,
-        firstName: 'Admin',
-        lastName: 'User',
-        email: 'admin@example.com',
-        phone: '+1 (555) 000-0000',
-        address: '123 Admin Street, Admin City, AC 12345',
-        birthDate: '1990-01-01',
-        role: 'ADMIN',
-        createdAt: '2024-01-01T00:00:00Z',
-        updatedAt: '2024-01-01T00:00:00Z'
-      })
       
       setUsers(transformedUsers)
     } catch (error) {

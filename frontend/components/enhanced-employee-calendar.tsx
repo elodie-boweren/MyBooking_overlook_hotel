@@ -234,9 +234,18 @@ export default function EnhancedEmployeeCalendar() {
       // Show events for the selected day
       const targetDate = currentDate.toISOString().split('T')[0]
       const filtered = events.filter(event => {
-        // For training events, show if they span the selected day
+        // For training events, check if they fall on the selected day
         if (event.type === 'training') {
-          return true // Training events are shown for the entire period
+          if (!event.date) return false
+          // Check if the selected date falls within the training period
+          if (event.startDate && event.endDate) {
+            const selectedDate = new Date(targetDate)
+            const startDate = new Date(event.startDate)
+            const endDate = new Date(event.endDate)
+            return selectedDate >= startDate && selectedDate <= endDate
+          }
+          // Fallback to single date check
+          return event.date === targetDate
         }
         // For shifts and tasks, show if they're on the selected day
         return event.date === targetDate
@@ -253,7 +262,17 @@ export default function EnhancedEmployeeCalendar() {
       
       const filtered = events.filter(event => {
         if (event.type === 'training') {
-          return true // Training events span multiple days
+          // For training events, check if they overlap with the week
+          if (!event.date) return false
+          if (event.startDate && event.endDate) {
+            const trainingStart = new Date(event.startDate)
+            const trainingEnd = new Date(event.endDate)
+            // Check if training period overlaps with the week
+            return trainingStart <= endOfWeek && trainingEnd >= startOfWeek
+          }
+          // Fallback to single date check
+          const eventDate = new Date(event.date)
+          return eventDate >= startOfWeek && eventDate <= endOfWeek
         }
         if (!event.date) return false
         
@@ -270,7 +289,17 @@ export default function EnhancedEmployeeCalendar() {
       
       const filtered = events.filter(event => {
         if (event.type === 'training') {
-          return true // Training events span multiple days
+          // For training events, check if they overlap with the month
+          if (!event.date) return false
+          if (event.startDate && event.endDate) {
+            const trainingStart = new Date(event.startDate)
+            const trainingEnd = new Date(event.endDate)
+            // Check if training period overlaps with the month
+            return trainingStart <= monthEnd && trainingEnd >= monthStart
+          }
+          // Fallback to single date check
+          const eventDate = new Date(event.date)
+          return eventDate >= monthStart && eventDate <= monthEnd
         }
         if (!event.date) return false
         

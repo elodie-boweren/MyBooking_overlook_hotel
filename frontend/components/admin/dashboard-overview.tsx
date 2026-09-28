@@ -302,10 +302,10 @@ export function DashboardOverview() {
             total: 15
           },
           users: {
-            total: allUsers.length || loyaltyAccounts.length + 1, // Use real user data or fallback
-            clients: clients || loyaltyAccounts.length,
-            employees: employees || 0,
-            admins: admins || 1
+            total: allUsers.length, // Use real user data only
+            clients: clients,
+            employees: employees,
+            admins: admins
           },
           system: {
             recentBookings: 19,
@@ -336,10 +336,10 @@ export function DashboardOverview() {
             total: 15
           },
           users: {
-            total: allUsers.length || loyaltyAccounts.length + 1, // Use real user data or fallback
-            clients: clients || loyaltyAccounts.length,
-            employees: employees || 0,
-            admins: admins || 1
+            total: allUsers.length, // Use real user data only
+            clients: clients,
+            employees: employees,
+            admins: admins
           },
           system: {
             recentBookings: 19,

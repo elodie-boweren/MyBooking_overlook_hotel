@@ -12,8 +12,12 @@ import { usePathname } from "next/navigation"
 function ConditionalNavigation() {
   const pathname = usePathname()
 
-  // <CHANGE> Don't show main navigation on admin and employee routes
-  if (pathname?.startsWith("/employee") || pathname?.startsWith("/admin")) {
+  // Don't show main navigation on admin, employee routes, start page, login page, and register page
+  if (pathname?.startsWith("/employee") || 
+      pathname?.startsWith("/admin") || 
+      pathname === "/" || 
+      pathname === "/login" ||
+      pathname === "/register") {
     return null
   }
 

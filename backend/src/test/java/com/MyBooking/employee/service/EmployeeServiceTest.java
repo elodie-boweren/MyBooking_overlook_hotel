@@ -228,7 +228,7 @@ class EmployeeServiceTest {
         // Given
         Pageable pageable = PageRequest.of(0, 10);
         Page<Employee> expectedPage = new PageImpl<>(Arrays.asList(testEmployee), pageable, 1);
-        when(employeeRepository.findByCriteria(EmployeeStatus.ACTIVE, "Receptionist", pageable))
+        when(employeeRepository.findByStatusAndJobTitle(EmployeeStatus.ACTIVE, "Receptionist", pageable))
             .thenReturn(expectedPage);
 
         // When
@@ -239,7 +239,7 @@ class EmployeeServiceTest {
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).getStatus()).isEqualTo(EmployeeStatus.ACTIVE);
 
-        verify(employeeRepository).findByCriteria(EmployeeStatus.ACTIVE, "Receptionist", pageable);
+        verify(employeeRepository).findByStatusAndJobTitle(EmployeeStatus.ACTIVE, "Receptionist", pageable);
     }
 
     @Test

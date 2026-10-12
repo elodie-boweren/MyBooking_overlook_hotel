@@ -534,7 +534,7 @@ class LeaveRequestRepositoryTest {
         assertThat(recentPendingRequests.get(0).getEmployee().getId()).isEqualTo(employee2.getId());
         assertThat(recentPendingRequests.get(0).getFromDate()).isEqualTo(leaveRequest6.getFromDate());
         assertThat(recentPendingRequests.get(1).getStatus()).isEqualTo(LeaveRequestStatus.PENDING);
-        assertThat(recentPendingRequests.get(1).getEmployee().getId()).isEqualTo(73L);
+        assertThat(recentPendingRequests.get(1).getEmployee().getId()).isEqualTo(employee3.getId());
         assertThat(recentPendingRequests.get(1).getFromDate()).isEqualTo(leaveRequest9.getFromDate());
         assertThat(recentPendingRequests.get(2).getStatus()).isEqualTo(LeaveRequestStatus.PENDING);
         assertThat(recentPendingRequests.get(2).getEmployee().getId()).isEqualTo(employee5.getId());

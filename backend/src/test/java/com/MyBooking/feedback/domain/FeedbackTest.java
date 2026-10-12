@@ -115,7 +115,7 @@ class FeedbackTest {
         feedback.setRating(6);
         violations = validator.validate(feedback);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Rating must not exceed 5")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Rating must be at most 5")));
     }
 
     @Test
@@ -124,7 +124,7 @@ class FeedbackTest {
         feedback.setComment("A".repeat(1001));
         Set<ConstraintViolation<Feedback>> violations = validator.validate(feedback);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Comment must not exceed 1000 characters")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Comment cannot exceed 1000 characters")));
     }
 
     @Test

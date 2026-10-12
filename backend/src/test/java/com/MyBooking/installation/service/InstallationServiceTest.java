@@ -125,7 +125,7 @@ class InstallationServiceTest {
         String newCurrency = "EUR";
         String newEquipment = "Updated equipment";
 
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
         when(installationRepository.existsByNameIgnoreCase(newName)).thenReturn(false);
         when(installationRepository.save(any(Installation.class))).thenReturn(testInstallation);
 
@@ -134,7 +134,7 @@ class InstallationServiceTest {
 
         // Then
         assertThat(result).isNotNull();
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
         verify(installationRepository).existsByNameIgnoreCase(newName);
         verify(installationRepository).save(any(Installation.class));
     }
@@ -143,7 +143,7 @@ class InstallationServiceTest {
     void updateInstallation_WithNonExistentId_ShouldThrowNotFoundException() {
         // Given
         Long installationId = 999L;
-        when(installationRepository.findById(installationId)).thenReturn(Optional.empty());
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> installationService.updateInstallation(installationId, "Name", "Description", InstallationType.CONFERENCE_ROOM, 50, new BigDecimal("100.00"), "USD", "Equipment"))
@@ -155,14 +155,14 @@ class InstallationServiceTest {
     void deleteInstallation_WithNoEvents_ShouldDeleteInstallation() {
         // Given
         Long installationId = 1L;
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
         when(eventRepository.findByInstallation(testInstallation)).thenReturn(Collections.emptyList());
 
         // When
         installationService.deleteInstallation(installationId);
 
         // Then
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
         verify(eventRepository).findByInstallation(testInstallation);
         verify(installationRepository).delete(testInstallation);
     }
@@ -171,7 +171,7 @@ class InstallationServiceTest {
     void deleteInstallation_WithExistingEvents_ShouldThrowBusinessRuleException() {
         // Given
         Long installationId = 1L;
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
         when(eventRepository.findByInstallation(testInstallation)).thenReturn(Arrays.asList(testEvent));
 
         // When & Then
@@ -184,7 +184,7 @@ class InstallationServiceTest {
     void getInstallationById_WithValidId_ShouldReturnInstallation() {
         // Given
         Long installationId = 1L;
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
 
         // When
         Installation result = installationService.getInstallationById(installationId);
@@ -193,14 +193,14 @@ class InstallationServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(1L);
         assertThat(result.getName()).isEqualTo("Grand Ballroom");
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
     }
 
     @Test
     void getInstallationById_WithInvalidId_ShouldThrowNotFoundException() {
         // Given
         Long installationId = 999L;
-        when(installationRepository.findById(installationId)).thenReturn(Optional.empty());
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> installationService.getInstallationById(installationId))
@@ -214,7 +214,7 @@ class InstallationServiceTest {
         Pageable pageable = PageRequest.of(0, 10);
         List<Installation> installations = Arrays.asList(testInstallation);
         Page<Installation> page = new PageImpl<>(installations);
-        when(installationRepository.findAll(pageable)).thenReturn(page);
+        when(installationRepository.findAllWithoutEvents(pageable)).thenReturn(page);
 
         // When
         Page<Installation> result = installationService.getAllInstallations(pageable);
@@ -223,7 +223,7 @@ class InstallationServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0).getName()).isEqualTo("Grand Ballroom");
-        verify(installationRepository).findAll(pageable);
+        verify(installationRepository).findAllWithoutEvents(pageable);
     }
 
     // ==================== AVAILABILITY & CAPACITY TESTS ====================
@@ -235,7 +235,7 @@ class InstallationServiceTest {
         LocalDateTime startDateTime = LocalDateTime.of(2024, 6, 16, 10, 0);
         LocalDateTime endDateTime = LocalDateTime.of(2024, 6, 16, 12, 0);
 
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
         when(eventRepository.findByInstallation(testInstallation)).thenReturn(Collections.emptyList());
         when(eventRepository.checkEventAvailability(startDateTime, endDateTime)).thenReturn(Collections.emptyList());
 
@@ -244,7 +244,7 @@ class InstallationServiceTest {
 
         // Then
         assertThat(result).isTrue();
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
         verify(eventRepository).checkEventAvailability(startDateTime, endDateTime);
     }
 
@@ -255,7 +255,7 @@ class InstallationServiceTest {
         LocalDateTime startDateTime = LocalDateTime.of(2024, 6, 15, 10, 0);
         LocalDateTime endDateTime = LocalDateTime.of(2024, 6, 15, 12, 0);
 
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
         when(eventRepository.findByInstallation(testInstallation)).thenReturn(Arrays.asList(testEvent));
         when(eventRepository.checkEventAvailability(startDateTime, endDateTime)).thenReturn(Arrays.asList(testEvent));
 
@@ -264,7 +264,7 @@ class InstallationServiceTest {
 
         // Then
         assertThat(result).isFalse();
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
         verify(eventRepository).checkEventAvailability(startDateTime, endDateTime);
     }
 
@@ -273,14 +273,14 @@ class InstallationServiceTest {
         // Given
         Long installationId = 1L;
         Integer participants = 50;
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
 
         // When
         boolean result = installationService.canAccommodateParticipants(installationId, participants);
 
         // Then
         assertThat(result).isTrue();
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
     }
 
     @Test
@@ -288,14 +288,14 @@ class InstallationServiceTest {
         // Given
         Long installationId = 1L;
         Integer participants = 150; // More than capacity of 100
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
 
         // When
         boolean result = installationService.canAccommodateParticipants(installationId, participants);
 
         // Then
         assertThat(result).isFalse();
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
     }
 
     @Test
@@ -308,7 +308,7 @@ class InstallationServiceTest {
 
         List<Installation> suitableInstallations = Arrays.asList(testInstallation);
         when(installationRepository.findSuitableForParticipants(participants)).thenReturn(suitableInstallations);
-        when(installationRepository.findById(testInstallation.getId())).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(testInstallation.getId())).thenReturn(Optional.of(testInstallation));
         when(eventRepository.findByInstallation(testInstallation)).thenReturn(Collections.emptyList());
         when(eventRepository.checkEventAvailability(startDateTime, endDateTime)).thenReturn(Collections.emptyList());
 
@@ -332,14 +332,14 @@ class InstallationServiceTest {
         LocalDateTime endDateTime = LocalDateTime.of(2024, 6, 15, 12, 0); // 2 hours
         BigDecimal expectedCost = new BigDecimal("300.00"); // 2 hours * $150/hour
 
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
 
         // When
         BigDecimal result = installationService.calculateEventCost(installationId, startDateTime, endDateTime);
 
         // Then
         assertThat(result).isEqualByComparingTo(expectedCost);
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
     }
 
     @Test
@@ -350,14 +350,14 @@ class InstallationServiceTest {
         LocalDateTime endDateTime = LocalDateTime.of(2024, 6, 15, 10, 30); // 30 minutes, should be 1 hour minimum
         BigDecimal expectedCost = new BigDecimal("150.00"); // 1 hour * $150/hour
 
-        when(installationRepository.findById(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
 
         // When
         BigDecimal result = installationService.calculateEventCost(installationId, startDateTime, endDateTime);
 
         // Then
         assertThat(result).isEqualByComparingTo(expectedCost);
-        verify(installationRepository).findById(installationId);
+        verify(installationRepository).findByIdWithoutEvents(installationId);
     }
 
     @Test

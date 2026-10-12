@@ -117,19 +117,19 @@ class FeedbackReplyTest {
         feedbackReply.setMessage(null);
         Set<ConstraintViolation<FeedbackReply>> violations = validator.validate(feedbackReply);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Reply message is required")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Message is required")));
 
         // Test blank message
         feedbackReply.setMessage("");
         violations = validator.validate(feedbackReply);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Reply message is required")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Message is required")));
 
         // Test message too long
-        feedbackReply.setMessage("A".repeat(1001));
+        feedbackReply.setMessage("A".repeat(2001));
         violations = validator.validate(feedbackReply);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Reply message must not exceed 1000 characters")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Message cannot exceed 2000 characters")));
     }
 
     @Test

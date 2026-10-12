@@ -22,6 +22,7 @@ public class LoyaltyAccount {
     @NotNull(message = "User is required")
     private User user;
 
+    @NotNull(message = "Balance is required")
     @Min(value = 0, message = "Balance cannot be negative")
     @Column(name = "balance", nullable = false)
     private Integer balance = 0;

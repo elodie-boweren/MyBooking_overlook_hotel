@@ -12,6 +12,7 @@ import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
 import com.MyBooking.event.domain.Event;
 import com.MyBooking.event.domain.EventType;
+import com.MyBooking.event.repository.EventBookingRepository;
 import com.MyBooking.event.repository.EventRepository;
 import com.MyBooking.installation.domain.Installation;
 import com.MyBooking.installation.domain.InstallationType;
@@ -43,6 +44,9 @@ class EventServiceTest {
 
     @Mock
     private EventRepository eventRepository;
+
+    @Mock
+    private EventBookingRepository eventBookingRepository;
 
     @Mock
     private InstallationRepository installationRepository;
@@ -255,6 +259,7 @@ class EventServiceTest {
         futureEvent.setStartAt(LocalDateTime.now().plusDays(2)); // More than 24 hours away
         
         when(eventRepository.findById(1L)).thenReturn(Optional.of(futureEvent));
+        when(eventBookingRepository.findByEventId(1L)).thenReturn(Collections.emptyList());
         doNothing().when(eventRepository).delete(any(Event.class));
 
         // When
@@ -262,6 +267,7 @@ class EventServiceTest {
 
         // Then
         verify(eventRepository).findById(1L);
+        verify(eventBookingRepository).findByEventId(1L);
         verify(eventRepository).delete(any(Event.class));
     }
 

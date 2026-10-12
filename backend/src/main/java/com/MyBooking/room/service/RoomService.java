@@ -199,8 +199,8 @@ public class RoomService {
         room.setStatus(newStatus);
         Room savedRoom = roomRepository.save(room);
         
-        // Temporarily disable logging to test
-        // logRoomStatusUpdate(room, oldStatus, newStatus, "Status updated", updatedBy);
+        // Log status update
+        logRoomStatusUpdate(room, oldStatus, newStatus, "Status updated", updatedBy);
         
         return savedRoom;
     }

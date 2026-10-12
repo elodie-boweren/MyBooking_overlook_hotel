@@ -70,7 +70,7 @@ class LoyaltyTransactionTest {
         // Create loyalty transaction
         loyaltyTransaction = new LoyaltyTransaction();
         loyaltyTransaction.setAccount(loyaltyAccount);
-        loyaltyTransaction.setType(LoyaltyTransactionType.EARN);
+        loyaltyTransaction.setType(LoyaltyTxType.EARN);
         loyaltyTransaction.setPoints(50);
         loyaltyTransaction.setReservation(reservation);
     }
@@ -111,21 +111,21 @@ class LoyaltyTransactionTest {
         loyaltyTransaction.setPoints(0);
         violations = validator.validate(loyaltyTransaction);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Points must be at least 1")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Points must be positive")));
 
         // Test negative points
         loyaltyTransaction.setPoints(-10);
         violations = validator.validate(loyaltyTransaction);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Points must be at least 1")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Points must be positive")));
     }
 
     @Test
     void testConstructor() {
-        LoyaltyTransaction newTransaction = new LoyaltyTransaction(loyaltyAccount, LoyaltyTransactionType.REDEEM, 25, reservation);
+        LoyaltyTransaction newTransaction = new LoyaltyTransaction(loyaltyAccount, LoyaltyTxType.REDEEM, 25, reservation);
         
         assertEquals(loyaltyAccount, newTransaction.getAccount());
-        assertEquals(LoyaltyTransactionType.REDEEM, newTransaction.getType());
+        assertEquals(LoyaltyTxType.REDEEM, newTransaction.getType());
         assertEquals(25, newTransaction.getPoints());
         assertEquals(reservation, newTransaction.getReservation());
     }
@@ -133,9 +133,11 @@ class LoyaltyTransactionTest {
     @Test
     void testTransactionTypeEnumValues() {
         // Test all transaction type enum values
-        assertEquals(2, LoyaltyTransactionType.values().length);
-        assertTrue(Set.of(LoyaltyTransactionType.values()).contains(LoyaltyTransactionType.EARN));
-        assertTrue(Set.of(LoyaltyTransactionType.values()).contains(LoyaltyTransactionType.REDEEM));
+        assertEquals(2, LoyaltyTxType.values().length);
+        assertTrue(Set.of(LoyaltyTxType.values()).contains(LoyaltyTxType.EARN));
+        assertTrue(Set.of(LoyaltyTxType.values()).contains(LoyaltyTxType.REDEEM));
+        assertEquals("Earn points", LoyaltyTxType.EARN.getDescription());
+        assertEquals("Redeem points", LoyaltyTxType.REDEEM.getDescription());
     }
 
     @Test

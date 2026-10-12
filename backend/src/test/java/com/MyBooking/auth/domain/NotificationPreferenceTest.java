@@ -35,6 +35,7 @@ class NotificationPreferenceTest {
         
         notificationPreference = new NotificationPreference();
         notificationPreference.setUser(user);
+        notificationPreference.setNotificationType("BOOKING_CONFIRMATION");
         notificationPreference.setEmailEnabled(true);
         notificationPreference.setSmsEnabled(false);
     }
@@ -55,12 +56,21 @@ class NotificationPreferenceTest {
     }
 
     @Test
+    void testNotificationTypeValidation() {
+        // Test null notification type
+        notificationPreference.setNotificationType(null);
+        Set<ConstraintViolation<NotificationPreference>> violations = validator.validate(notificationPreference);
+        assertFalse(violations.isEmpty());
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Notification type is required")));
+    }
+
+    @Test
     void testEmailEnabledValidation() {
         // Test null email enabled
         notificationPreference.setEmailEnabled(null);
         Set<ConstraintViolation<NotificationPreference>> violations = validator.validate(notificationPreference);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Email enabled preference is required")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Email enabled is required")));
     }
 
     @Test
@@ -69,16 +79,18 @@ class NotificationPreferenceTest {
         notificationPreference.setSmsEnabled(null);
         Set<ConstraintViolation<NotificationPreference>> violations = validator.validate(notificationPreference);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("SMS enabled preference is required")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("SMS enabled is required")));
     }
 
     @Test
     void testConstructor() {
-        NotificationPreference newPreference = new NotificationPreference(user, false, true);
+        NotificationPreference newPreference = new NotificationPreference(user, "BOOKING_CONFIRMATION", false, true, true);
         
         assertEquals(user, newPreference.getUser());
+        assertEquals("BOOKING_CONFIRMATION", newPreference.getNotificationType());
         assertEquals(false, newPreference.getEmailEnabled());
         assertEquals(true, newPreference.getSmsEnabled());
+        assertEquals(true, newPreference.getPushEnabled());
     }
 
     @Test

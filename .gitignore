@@ -31,3 +31,11 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### macOS ###
+.DS_Store
+
+### Local Working Notes & Governance ###
+RULES.md
+current_state_assessment_and_roadmap.md
+reconstituted_target_architecture_workshop.md

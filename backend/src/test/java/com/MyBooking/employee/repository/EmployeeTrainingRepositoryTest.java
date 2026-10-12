@@ -236,9 +236,9 @@ class EmployeeTrainingRepositoryTest {
     void testFindByAssignedAt() {
         // Since all entities are created at the same time within this test, they all have the same assignedAt timestamp
         LocalDateTime actualAssignedAt = employeeTraining1.getAssignedAt();
-        // Use a small range to account for millisecond differences
-        LocalDateTime startTime = actualAssignedAt.minusNanos(1000000); // 1ms before
-        LocalDateTime endTime = actualAssignedAt.plusNanos(1000000); // 1ms after
+        // Use a reasonable range to account for database timestamp precision
+        LocalDateTime startTime = actualAssignedAt.minusSeconds(5);
+        LocalDateTime endTime = actualAssignedAt.plusSeconds(5);
         List<EmployeeTraining> assignedAtSameTime = employeeTrainingRepository.findByAssignedAtBetween(startTime, endTime);
         
         assertThat(assignedAtSameTime).hasSize(6);

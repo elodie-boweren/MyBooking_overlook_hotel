@@ -14,8 +14,8 @@ This register documents all Architecture Decision Records (ADRs) for the MyBooki
 
 | ADR ID | Title | Scope / Context | Status | Target Phase |
 | :--- | :--- | :--- | :--- | :--- |
-| **ADR-0001** | Modular Monolith Foundation to Staged Evolutionary Microservices | Architecture Style | **Accepted** | Phase 01 / Phase 04 |
-| **ADR-0002** | Single Authoritative Backend Root (`backend/src`) & Test Harness Standards | Build & Project Structure | **Accepted** | Phase 01 |
+| **ADR-0001** | [Modular Monolith Foundation to Staged Evolutionary Microservices](ADR-0001-modular-monolith-to-evolutionary-microservices.md) | Architecture Style | **Accepted** | Phase 01 / Phase 04 |
+| **ADR-0002** | [Single Authoritative Backend Root (`backend/src`) & Test Harness Standards](ADR-0002-backend-root-consolidation-and-test-harness.md) | Build & Project Structure | **Accepted** | Phase 01 |
 | **ADR-0003** | Zero-Trust Principal Identity Resolution & Deprecation of `X-User-Id` | Security & Auth | **Proposed** | Phase 02 |
 | **ADR-0004** | Coexistence Strategy: Next.js 14 Web Guest Portal + Rust/Tauri Staff Desktop | Frontend & Client Tier | **Accepted** | Phase 01 / Phase 14 |
 | **ADR-0005** | Database-per-Service & Polyglot Persistence Strategy | Data Architecture | **Accepted** | Phase 04 / Phase 10 |

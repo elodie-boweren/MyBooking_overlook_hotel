@@ -2,36 +2,43 @@ package com.MyBooking.common.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.io.Decoders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
-import java.security.Key;
-import javax.crypto.SecretKey; 
 
 @Service
 public class JwtService {
-    @Value("${jwt.secret:mySecretKey}")
+    @Value("${jwt.secret}")
     private String secretKey;
 
     @Value("${jwt.expiration:86400000}")
     private long jwtExpiration; 
 
-    public String generateToken(String username, String role) {
+    public String generateToken(Long userId, String username, String role) {
         return Jwts.builder()
-        .setSubject(username)
-        .claim("role", role)
-        .setIssuedAt(new Date())
-        .setExpiration(new Date(System.currentTimeMillis() + jwtExpiration))
-        .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-        .compact();
+            .subject(username)
+            .claim("userId", userId)
+            .claim("role", role)
+            .issuedAt(new Date())
+            .expiration(new Date(System.currentTimeMillis() + jwtExpiration))
+            .signWith(getSigningKey(), Jwts.SIG.HS256)
+            .compact();
     }
+
+    @Deprecated
+    public String generateToken(String username, String role) {
+        return generateToken(1L, username, role);
+    }
+
     public boolean validateToken(String token) {
         try {
             Jwts.parser()
-            .verifyWith(getSigningKey())
-            .build()
-            .parseSignedClaims(token);
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token);
             return true; 
         } catch (JwtException | IllegalArgumentException e) {
             return false;
@@ -40,26 +47,41 @@ public class JwtService {
     
     public String extractUsername(String token) {
         return Jwts.parser()
-        .verifyWith(getSigningKey())
-        .build()
-        .parseSignedClaims(token)
-        .getPayload()
-        .getSubject();
+            .verifyWith(getSigningKey())
+            .build()
+            .parseSignedClaims(token)
+            .getPayload()
+            .getSubject();
     }
     
     public String extractRole(String token) {
         return Jwts.parser()
-        .verifyWith(getSigningKey())
-        .build()
-        .parseSignedClaims(token)
-        .getPayload()
-        .get("role", String.class);
+            .verifyWith(getSigningKey())
+            .build()
+            .parseSignedClaims(token)
+            .getPayload()
+            .get("role", String.class);
+    }
+
+    public Long extractUserId(String token) {
+        Object userId = Jwts.parser()
+            .verifyWith(getSigningKey())
+            .build()
+            .parseSignedClaims(token)
+            .getPayload()
+            .get("userId");
+        if (userId instanceof Number number) {
+            return number.longValue();
+        }
+        return userId != null ? Long.parseLong(userId.toString()) : null;
     }
     
-    // Get signing key
+    public String getSecretKey() {
+        return secretKey;
+    }
+
     private SecretKey getSigningKey() {
-        // Use the secret key directly as bytes for HMAC
-        byte[] keyBytes = secretKey.getBytes();
+        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }

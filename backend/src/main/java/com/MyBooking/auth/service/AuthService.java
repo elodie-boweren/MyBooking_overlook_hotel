@@ -100,7 +100,7 @@ public class AuthService {
         }
 
         // Generate JWT token
-        return jwtService.generateToken(user.getEmail(), user.getRole().toString());
+        return jwtService.generateToken(user.getId(), user.getEmail(), user.getRole().toString());
     }
 
     /**

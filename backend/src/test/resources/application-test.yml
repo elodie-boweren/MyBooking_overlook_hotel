@@ -16,6 +16,10 @@ spring:
     console:
       enabled: true
 
+jwt:
+  secret: testSecretKeyMustBeAtLeast32BytesLongForHmacSha256!
+  expiration: 86400000
+
 logging:
   level:
     org.springframework.test: DEBUG

@@ -1,8 +1,12 @@
 package com.MyBooking.common.exception;
 
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authorization.AuthorizationDeniedException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -45,15 +49,29 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
     }
 
-    @ExceptionHandler(AuthorizationDeniedException.class)
-    public ResponseEntity<ErrorResponse> handleAuthorizationDeniedException(AuthorizationDeniedException ex, WebRequest request) {
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDeniedException(AccessDeniedException ex, WebRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        HttpHeaders headers = new HttpHeaders();
+        if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+            headers.add(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
+            ErrorResponse errorResponse = new ErrorResponse(
+                HttpStatus.UNAUTHORIZED.value(),
+                "Unauthorized",
+                "Full authentication is required to access this resource",
+                request.getDescription(false)
+            );
+            return new ResponseEntity<>(errorResponse, headers, HttpStatus.UNAUTHORIZED);
+        }
+
+        headers.add(HttpHeaders.WWW_AUTHENTICATE, "Bearer error=\"insufficient_scope\", error_description=\"The request requires higher privileges\"");
         ErrorResponse errorResponse = new ErrorResponse(
             HttpStatus.FORBIDDEN.value(),
             "Access Denied",
             "You do not have permission to access this resource",
             request.getDescription(false)
         );
-        return new ResponseEntity<>(errorResponse, HttpStatus.FORBIDDEN);
+        return new ResponseEntity<>(errorResponse, headers, HttpStatus.FORBIDDEN);
     }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex, WebRequest request) {

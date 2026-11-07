@@ -1,9 +1,9 @@
 package com.MyBooking.reservation.controller;
 
+import com.MyBooking.common.security.UserPrincipal;
 import com.MyBooking.reservation.dto.*;
 import com.MyBooking.reservation.domain.ReservationStatus;
 import com.MyBooking.reservation.service.ReservationService;
-import com.MyBooking.common.security.JwtService;
 import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
 import jakarta.validation.Valid;
@@ -13,6 +13,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -28,10 +29,6 @@ public class ClientReservationController {
     @Autowired
     private ReservationService reservationService;
 
-    @Autowired
-    private JwtService jwtService;
-    
-
     /**
      * Create a new reservation
      * POST /api/client/reservations
@@ -39,10 +36,10 @@ public class ClientReservationController {
     @PostMapping
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<ReservationResponseDto> createReservation(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody ReservationCreateRequestDto request) {
         try {
-            Long clientId = extractUserIdFromToken(authHeader);
+            Long clientId = principal.getId();
             
             // Use points redemption method if points are being used
             ReservationResponseDto response;
@@ -69,10 +66,10 @@ public class ClientReservationController {
     @GetMapping("/my")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<Page<ReservationResponseDto>> getMyReservations(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             Pageable pageable) {
         try {
-            Long clientId = extractUserIdFromToken(authHeader);
+            Long clientId = principal.getId();
             Page<ReservationResponseDto> reservations = reservationService.getReservationsByClientId(clientId, pageable);
             return ResponseEntity.ok(reservations);
         } catch (Exception e) {
@@ -87,7 +84,7 @@ public class ClientReservationController {
     @GetMapping("/search")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<Page<ReservationResponseDto>> searchMyReservations(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) Long roomId,
             @RequestParam(required = false) ReservationStatus status,
             @RequestParam(required = false) String checkInFrom,
@@ -96,7 +93,7 @@ public class ClientReservationController {
             @RequestParam(required = false) String checkOutTo,
             Pageable pageable) {
         try {
-            Long clientId = extractUserIdFromToken(authHeader);
+            Long clientId = principal.getId();
             
             // Create search criteria DTO
             ReservationSearchCriteriaDto criteria = new ReservationSearchCriteriaDto();
@@ -166,9 +163,9 @@ public class ClientReservationController {
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<ReservationResponseDto> getReservation(
             @PathVariable Long id,
-            @RequestHeader("Authorization") String authHeader) {
+            @AuthenticationPrincipal UserPrincipal principal) {
         try {
-            Long clientId = extractUserIdFromToken(authHeader);
+            Long clientId = principal.getId();
             ReservationResponseDto reservation = reservationService.getReservationByIdAndClientId(id, clientId);
             return ResponseEntity.ok(reservation);
         } catch (NotFoundException e) {
@@ -188,10 +185,10 @@ public class ClientReservationController {
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<ReservationResponseDto> updateReservation(
             @PathVariable Long id,
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody ReservationUpdateRequestDto request) {
         try {
-            Long clientId = extractUserIdFromToken(authHeader);
+            Long clientId = principal.getId();
             ReservationResponseDto updatedReservation = reservationService.updateReservation(id, request, clientId);
             return ResponseEntity.ok(updatedReservation);
         } catch (NotFoundException e) {
@@ -211,9 +208,9 @@ public class ClientReservationController {
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<Void> cancelReservation(
             @PathVariable Long id,
-            @RequestHeader("Authorization") String authHeader) {
+            @AuthenticationPrincipal UserPrincipal principal) {
         try {
-            Long clientId = extractUserIdFromToken(authHeader);
+            Long clientId = principal.getId();
             reservationService.cancelReservation(id, clientId);
             return ResponseEntity.noContent().build();
         } catch (NotFoundException e) {
@@ -223,19 +220,5 @@ public class ClientReservationController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-    }
-
-
-
-    /**
-     * Extract user ID from JWT token
-     */
-    private Long extractUserIdFromToken(String authHeader) {
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
-            String email = jwtService.extractUsername(token);
-            return reservationService.getUserIdByEmail(email);
-        }
-        throw new BusinessRuleException("Invalid authorization header");
     }
 }

@@ -1,7 +1,7 @@
 # ADR-0003: Zero-Trust Principal Identity Resolution & Deprecation of Client-Supplied Identity
 
 ## Status
-**Accepted**
+**Accepted & Implemented** (Phase 2 completed November 2026)
 
 ## Context & Problem Statement
 In the initial baseline implementation of the MyBooking platform, endpoints in `EmployeeController` relied on an unauthenticated client-supplied HTTP header (`X-User-Id: <id>`) to identify the calling employee. This created a critical Broken Object Level Authorization (BOLA / IDOR, OWASP API1:2023) vulnerability: any authenticated user could read or modify another employee's shifts, tasks, profile, and leave requests simply by tampering with the header.
@@ -73,10 +73,16 @@ How do we establish a secure, zero-trust identity resolution model that eliminat
    - Refactor 25 endpoints across 7 controllers (`ClientReservationController`, `EventBookingController`, `FeedbackController`, `FeedbackReplyController`, `LoyaltyController`, `AuthController`, `RoomController`) to inject `@AuthenticationPrincipal UserPrincipal principal`.
    - Delete manual `extractUserIdFromToken` / `substring(7)` methods.
    - Deprecate/remove redundant `getUserIdByEmail` database lookup methods in domain services.
-5. **Target Evolution to Keycloak (Milestone IdP)**:
+5. **Standardized RFC 6750 Challenge & Error Handling**:
+   - Filter-level authentication entry points (`BearerTokenAuthenticationEntryPoint`) reject unauthenticated or corrupted requests with HTTP 401 Unauthorized and `WWW-Authenticate: Bearer error="invalid_token"`.
+   - Method-level authorization failures (`@PreAuthorize`) caught by `GlobalExceptionHandler` reject unauthorized requests with HTTP 403 Forbidden and `WWW-Authenticate: Bearer error="insufficient_scope"`. Anonymous method security rejections return HTTP 401 Unauthorized with `WWW-Authenticate: Bearer`.
+6. **Target Evolution to Keycloak (Milestone IdP)**:
    - When Keycloak is introduced, the transition to asymmetric RS256/ES256 verification requires **zero controller code changes**.
    - The `SecurityConfig` simply switches from `NimbusJwtDecoder.withSecretKey(...)` to `NimbusJwtDecoder.withJwkSetUri(...)` or `issuer-uri` in application configuration.
    - The `JwtAuthenticationConverter` will map Keycloak's `sub` UUID to the internal `UserPrincipal.id` via domain lookup or Keycloak token mapper claims.
+7. **Verification & Test Coverage**:
+   - Comprehensive test suite covering fail-fast validation (`FailFastSecretStartupTest`), converter verification (`JwtAuthenticationConverterTest`), IDOR spoofing resistance (`EmployeeControllerTest` - 11 tests), and end-to-end security integration (`SecurityIntegrationTest` - 12 tests).
+   - 100% test pass rate across 1,134 tests in the suite.
 
 ## Consequences & Operational Impact
 * **Positive**:

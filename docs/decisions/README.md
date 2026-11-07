@@ -16,7 +16,7 @@ This register documents all Architecture Decision Records (ADRs) for the MyBooki
 | :--- | :--- | :--- | :--- | :--- |
 | **ADR-0001** | [Modular Monolith Foundation to Staged Evolutionary Microservices](ADR-0001-modular-monolith-to-evolutionary-microservices.md) | Architecture Style | **Accepted** | Phase 01 / Phase 04 |
 | **ADR-0002** | [Single Authoritative Backend Root (`backend/src`) & Test Harness Standards](ADR-0002-backend-root-consolidation-and-test-harness.md) | Build & Project Structure | **Accepted** | Phase 01 |
-| **ADR-0003** | [Zero-Trust Principal Identity Resolution & Deprecation of Client-Supplied Identity](ADR-0003-zero-trust-principal-identity-resolution.md) | Security & Auth | **Accepted** | Phase 02 |
+| **ADR-0003** | [Zero-Trust Principal Identity Resolution & Deprecation of Client-Supplied Identity](ADR-0003-zero-trust-principal-identity-resolution.md) | Security & Auth | **Accepted & Implemented** | Phase 02 |
 | **ADR-0004** | [Client Tier Coexistence & Next.js BFF Session Encryption Key Management](ADR-0004-client-tier-coexistence-and-bff-session-encryption.md) | Frontend & Client Tier | **Accepted** | Phase 01 / Phase 14 / Milestone IdP |
 | **ADR-0005** | Database-per-Service & Polyglot Persistence Strategy | Data Architecture | **Accepted** | Phase 04 / Phase 10 |
 | **ADR-0006** | Transactional Outbox Pattern & Kafka Event Streaming for Async Side-Effects | Distributed Systems | **Proposed** | Phase 05 / Phase 09 |

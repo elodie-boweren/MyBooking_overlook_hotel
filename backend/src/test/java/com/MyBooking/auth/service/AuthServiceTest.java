@@ -144,7 +144,7 @@ class AuthServiceTest {
         
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(testUser));
         when(passwordEncoder.matches(password, testUser.getPassword())).thenReturn(true);
-        when(jwtService.generateToken(testUser.getEmail(), testUser.getRole().toString())).thenReturn(expectedToken);
+        when(jwtService.generateToken(testUser.getId(), testUser.getEmail(), testUser.getRole().toString())).thenReturn(expectedToken);
         
         // When
         String result = authService.authenticateUser(email, password);
@@ -153,7 +153,7 @@ class AuthServiceTest {
         assertThat(result).isEqualTo(expectedToken);
         verify(userRepository).findByEmail(email);
         verify(passwordEncoder).matches(password, testUser.getPassword());
-        verify(jwtService).generateToken(testUser.getEmail(), testUser.getRole().toString());
+        verify(jwtService).generateToken(testUser.getId(), testUser.getEmail(), testUser.getRole().toString());
     }
     
     @Test
@@ -172,7 +172,7 @@ class AuthServiceTest {
         
         verify(userRepository).findByEmail(email);
         verify(passwordEncoder).matches(password, testUser.getPassword());
-        verify(jwtService, never()).generateToken(anyString(), anyString());
+        verify(jwtService, never()).generateToken(any(), any(), any());
     }
     
     @Test

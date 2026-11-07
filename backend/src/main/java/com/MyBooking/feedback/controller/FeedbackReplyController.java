@@ -1,8 +1,8 @@
 package com.MyBooking.feedback.controller;
 
+import com.MyBooking.common.security.UserPrincipal;
 import com.MyBooking.feedback.dto.*;
 import com.MyBooking.feedback.service.FeedbackService;
-import com.MyBooking.common.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -20,12 +21,10 @@ import org.springframework.web.bind.annotation.*;
 public class FeedbackReplyController {
 
     private final FeedbackService feedbackService;
-    private final JwtService jwtService;
 
     @Autowired
-    public FeedbackReplyController(FeedbackService feedbackService, JwtService jwtService) {
+    public FeedbackReplyController(FeedbackService feedbackService) {
         this.feedbackService = feedbackService;
-        this.jwtService = jwtService;
     }
 
     // ==================== FEEDBACK REPLY ENDPOINTS ====================
@@ -36,11 +35,11 @@ public class FeedbackReplyController {
     @PostMapping("/feedback/{feedbackId}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('EMPLOYEE')")
     public ResponseEntity<FeedbackReplyResponseDto> createReply(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long feedbackId,
             @Valid @RequestBody CreateReplyRequestDto request) {
         
-        Long adminUserId = extractUserIdFromToken(token);
+        Long adminUserId = principal.getId();
         FeedbackReplyResponseDto response = feedbackService.createFeedbackReplyAsDto(
             feedbackId, adminUserId, request.getMessage());
         
@@ -63,11 +62,11 @@ public class FeedbackReplyController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('EMPLOYEE')")
     public ResponseEntity<FeedbackReplyResponseDto> updateReply(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id,
             @Valid @RequestBody UpdateReplyRequestDto request) {
         
-        Long adminUserId = extractUserIdFromToken(token);
+        Long adminUserId = principal.getId();
         FeedbackReplyResponseDto response = feedbackService.updateFeedbackReplyAsDto(
             id, adminUserId, request.getMessage());
         
@@ -80,10 +79,10 @@ public class FeedbackReplyController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('EMPLOYEE')")
     public ResponseEntity<Void> deleteReply(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id) {
         
-        Long adminUserId = extractUserIdFromToken(token);
+        Long adminUserId = principal.getId();
         feedbackService.deleteReply(id, adminUserId);
         return ResponseEntity.noContent().build();
     }
@@ -107,10 +106,10 @@ public class FeedbackReplyController {
     @GetMapping("/my")
     @PreAuthorize("hasRole('ADMIN') or hasRole('EMPLOYEE')")
     public ResponseEntity<Page<FeedbackReplyResponseDto>> getMyReplies(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             Pageable pageable) {
         
-        Long adminUserId = extractUserIdFromToken(token);
+        Long adminUserId = principal.getId();
         Page<FeedbackReplyResponseDto> response = feedbackService.getFeedbackRepliesByAdminEmployeeIdAsDto(adminUserId, pageable);
         return ResponseEntity.ok(response);
     }
@@ -136,13 +135,5 @@ public class FeedbackReplyController {
         
         Page<FeedbackReplyResponseDto> response = feedbackService.getRecentFeedbackRepliesAsDto(days, pageable);
         return ResponseEntity.ok(response);
-    }
-
-    // ==================== HELPER METHODS ====================
-
-    private Long extractUserIdFromToken(String token) {
-        String cleanToken = token.replace("Bearer ", "");
-        String email = jwtService.extractUsername(cleanToken);
-        return feedbackService.getUserIdByEmail(email);
     }
 }

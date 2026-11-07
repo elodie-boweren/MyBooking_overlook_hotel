@@ -800,8 +800,10 @@ public class EventService {
     }
     
     /**
-     * Get user ID by email (helper method for JWT token processing)
+     * Get user ID by email (legacy helper - use UserPrincipal.getId() instead)
+     * @deprecated Identity should be injected via UserPrincipal from token claims to avoid redundant DB queries.
      */
+    @Deprecated(forRemoval = true)
     public Long getUserIdByEmail(String email) {
         User user = userRepository.findByEmail(email)
             .orElseThrow(() -> new NotFoundException("User not found with email: " + email));

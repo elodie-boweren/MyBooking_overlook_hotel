@@ -1,16 +1,17 @@
 package com.MyBooking.event.controller;
 
+import com.MyBooking.common.security.UserPrincipal;
 import com.MyBooking.event.dto.EventBookingCreateRequestDto;
 import com.MyBooking.event.dto.EventBookingResponseDto;
 import com.MyBooking.event.domain.EventBookingStatus;
 import com.MyBooking.event.service.EventService;
-import com.MyBooking.common.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -18,11 +19,9 @@ import org.springframework.web.bind.annotation.*;
 public class EventBookingController {
     
     private final EventService eventService;
-    private final JwtService jwtService;
     
-    public EventBookingController(EventService eventService, JwtService jwtService) {
+    public EventBookingController(EventService eventService) {
         this.eventService = eventService;
-        this.jwtService = jwtService;
     }
     
     /**
@@ -32,9 +31,9 @@ public class EventBookingController {
     @PostMapping
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<EventBookingResponseDto> createEventBooking(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody EventBookingCreateRequestDto request) {
-        Long clientId = extractUserIdFromToken(authHeader);
+        Long clientId = principal.getId();
         EventBookingResponseDto booking = eventService.createEventBookingAsDto(request, clientId);
         return ResponseEntity.status(HttpStatus.CREATED).body(booking);
     }
@@ -46,9 +45,9 @@ public class EventBookingController {
     @GetMapping("/my")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<Page<EventBookingResponseDto>> getMyEventBookings(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             Pageable pageable) {
-        Long clientId = extractUserIdFromToken(authHeader);
+        Long clientId = principal.getId();
         Page<EventBookingResponseDto> bookings = eventService.getEventBookingsByUserAsDto(clientId, pageable);
         return ResponseEntity.ok(bookings);
     }
@@ -60,9 +59,9 @@ public class EventBookingController {
     @GetMapping("/{bookingId}")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<EventBookingResponseDto> getEventBookingById(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long bookingId) {
-        Long clientId = extractUserIdFromToken(authHeader);
+        Long clientId = principal.getId();
         EventBookingResponseDto booking = eventService.getEventBookingByIdAsDto(bookingId, clientId);
         return ResponseEntity.ok(booking);
     }
@@ -74,10 +73,10 @@ public class EventBookingController {
     @PutMapping("/{bookingId}/cancel")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<EventBookingResponseDto> cancelEventBooking(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long bookingId,
             @RequestParam(required = false) String reason) {
-        Long clientId = extractUserIdFromToken(authHeader);
+        Long clientId = principal.getId();
         EventBookingResponseDto booking = eventService.cancelEventBookingAsDto(bookingId, clientId, reason);
         return ResponseEntity.ok(booking);
     }
@@ -115,14 +114,5 @@ public class EventBookingController {
             @RequestParam EventBookingStatus status) {
         EventBookingResponseDto booking = eventService.updateEventBookingStatusAsDto(bookingId, status);
         return ResponseEntity.ok(booking);
-    }
-    
-    /**
-     * Helper method to extract user ID from JWT token
-     */
-    private Long extractUserIdFromToken(String authHeader) {
-        String token = authHeader.substring(7); // Remove "Bearer " prefix
-        String email = jwtService.extractUsername(token);
-        return eventService.getUserIdByEmail(email);
     }
 }

@@ -621,7 +621,8 @@ public class LoyaltyService {
             calculatedPoints, amount, calculatedDiscountAmount, maxRedeemablePoints, "STANDARD");
     }
 
-    // Utility method to get user ID by email
+    // Utility method to get user ID by email (legacy helper - use UserPrincipal.getId() instead)
+    @Deprecated(forRemoval = true)
     @Transactional(readOnly = true)
     public Long getUserIdByEmail(String email) {
         User user = userRepository.findByEmail(email)

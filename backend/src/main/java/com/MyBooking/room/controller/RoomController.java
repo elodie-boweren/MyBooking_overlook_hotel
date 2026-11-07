@@ -6,7 +6,7 @@ import com.MyBooking.room.service.RoomService;
 import com.MyBooking.auth.domain.User;
 import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
-import com.MyBooking.common.security.JwtService;
+import com.MyBooking.common.security.UserPrincipal;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -14,9 +14,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -28,9 +28,6 @@ public class RoomController {
 
     @Autowired
     private RoomService roomService;
-    
-    @Autowired
-    private JwtService jwtService;
 
     // ========== CLIENT & ADMIN ENDPOINTS ==========
 
@@ -233,13 +230,10 @@ public class RoomController {
     public ResponseEntity<Room> updateRoomStatus(
             @PathVariable Long roomId,
             @RequestBody RoomStatusUpdateRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal UserPrincipal principal) {
         
         try {
-            // Extract user from JWT token using the same pattern as AuthController
-            String authHeader = httpRequest.getHeader("Authorization");
-            String username = extractEmailFromToken(authHeader);
-            User user = roomService.getUserByUsername(username);
+            User user = roomService.getUserByUsername(principal.getEmail());
             
             // Use the simpler updateRoomStatus method without notes and reason
             Room updatedRoom = roomService.updateRoomStatus(
@@ -256,19 +250,6 @@ public class RoomController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
-    }
-
-    // ========== HELPER METHODS ==========
-
-    /**
-     * Extract email from JWT token (same pattern as AuthController)
-     */
-    private String extractEmailFromToken(String authHeader) {
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
-            return jwtService.extractUsername(token);
-        }
-        throw new BusinessRuleException("Invalid authorization header");
     }
 
     // ========== INNER CLASSES ==========

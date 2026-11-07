@@ -13,6 +13,7 @@ import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
 import com.MyBooking.common.mapper.PageResponse;
 import com.MyBooking.common.security.JwtService;
+import com.MyBooking.common.security.UserPrincipal;
 import jakarta.validation.Valid;
 import jakarta.validation.Validator;
 import jakarta.validation.ConstraintViolation;
@@ -22,6 +23,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Set;
@@ -105,9 +107,9 @@ public class AuthController {
      */
     @GetMapping("/profile")
     @PreAuthorize("hasAnyRole('CLIENT', 'EMPLOYEE', 'ADMIN')")
-    public ResponseEntity<UserResponseDto> getProfile(@RequestHeader("Authorization") String authHeader) {
+    public ResponseEntity<UserResponseDto> getProfile(@AuthenticationPrincipal UserPrincipal principal) {
         try {
-            String email = extractEmailFromToken(authHeader);
+            String email = principal.getEmail();
             User user = authService.getUserProfile(email);
             
             UserResponseDto response = new UserResponseDto(
@@ -135,10 +137,10 @@ public class AuthController {
     @PutMapping("/profile")
     @PreAuthorize("hasAnyRole('CLIENT', 'EMPLOYEE', 'ADMIN')")
     public ResponseEntity<User> updateProfile(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody User user) {
         try {
-            String email = extractEmailFromToken(authHeader);
+            String email = principal.getEmail();
             User updatedUser = authService.updateUserProfile(
                 email,
                 user.getFirstName(),
@@ -159,10 +161,10 @@ public class AuthController {
     @PutMapping("/change-password")
     @PreAuthorize("hasAnyRole('CLIENT', 'EMPLOYEE', 'ADMIN')")
     public ResponseEntity<Void> changePassword(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody ChangePasswordRequestDto request) {
         try {
-            String email = extractEmailFromToken(authHeader);
+            String email = principal.getEmail();
             authService.changePassword(email, request.getCurrentPassword(), request.getNewPassword());
             return ResponseEntity.ok().build();
         } catch (NotFoundException e) {
@@ -193,9 +195,9 @@ public class AuthController {
     @GetMapping("/notification-preferences")
     @PreAuthorize("hasAnyRole('CLIENT', 'EMPLOYEE', 'ADMIN')")
     public ResponseEntity<List<NotificationPreference>> getNotificationPreferences(
-            @RequestHeader("Authorization") String authHeader) {
+            @AuthenticationPrincipal UserPrincipal principal) {
         try {
-            String email = extractEmailFromToken(authHeader);
+            String email = principal.getEmail();
             List<NotificationPreference> preferences = authService.getUserNotificationPreferences(email);
             return ResponseEntity.ok(preferences);
         } catch (NotFoundException e) {
@@ -209,10 +211,10 @@ public class AuthController {
     @PutMapping("/notification-preferences")
     @PreAuthorize("hasAnyRole('CLIENT', 'EMPLOYEE', 'ADMIN')")
     public ResponseEntity<NotificationPreference> updateNotificationPreference(
-            @RequestHeader("Authorization") String authHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody NotificationPreferenceUpdateDto request) {
         try {
-            String email = extractEmailFromToken(authHeader);
+            String email = principal.getEmail();
             NotificationPreference updatedPreference = authService.updateNotificationPreference(
                 email,
                 request.getNotificationType(),
@@ -354,17 +356,11 @@ public class AuthController {
      * Logout user
      */
     @PostMapping("/logout")
-    public ResponseEntity<Void> logout(@RequestHeader("Authorization") String authHeader) {
-        try {
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                return ResponseEntity.badRequest().build();
-            }
-            String token = authHeader.substring(7); // Remove "Bearer " prefix
-            authService.logoutUser(token);
-            return ResponseEntity.ok().build();
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().build();
+    public ResponseEntity<Void> logout(@AuthenticationPrincipal UserPrincipal principal) {
+        if (principal != null) {
+            authService.logoutUser(principal.getEmail());
         }
+        return ResponseEntity.ok().build();
     }
 
 
@@ -375,16 +371,5 @@ public class AuthController {
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         return ResponseEntity.ok("Auth service is running");
-    }
-
-    /**
-     * Extract email from JWT token
-     */
-    private String extractEmailFromToken(String authHeader) {
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            String token = authHeader.substring(7);
-            return jwtService.extractUsername(token);
-        }
-        throw new BusinessRuleException("Invalid authorization header");
     }
 }

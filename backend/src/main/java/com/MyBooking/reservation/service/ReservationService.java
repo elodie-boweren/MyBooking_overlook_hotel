@@ -821,8 +821,10 @@ public class ReservationService {
     }
 
     /**
-     * Get user ID by email (for JWT token extraction)
+     * Get user ID by email (for legacy token extraction - use UserPrincipal.getId() instead)
+     * @deprecated Identity should be injected via UserPrincipal from token claims to avoid redundant DB queries.
      */
+    @Deprecated(forRemoval = true)
     @Transactional(readOnly = true)
     public Long getUserIdByEmail(String email) {
         User user = userRepository.findByEmail(email)

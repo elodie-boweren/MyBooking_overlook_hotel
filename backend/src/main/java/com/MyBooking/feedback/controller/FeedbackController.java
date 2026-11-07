@@ -1,8 +1,8 @@
 package com.MyBooking.feedback.controller;
 
+import com.MyBooking.common.security.UserPrincipal;
 import com.MyBooking.feedback.dto.*;
 import com.MyBooking.feedback.service.FeedbackService;
-import com.MyBooking.common.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -20,12 +21,10 @@ import org.springframework.web.bind.annotation.*;
 public class FeedbackController {
 
     private final FeedbackService feedbackService;
-    private final JwtService jwtService;
 
     @Autowired
-    public FeedbackController(FeedbackService feedbackService, JwtService jwtService) {
+    public FeedbackController(FeedbackService feedbackService) {
         this.feedbackService = feedbackService;
-        this.jwtService = jwtService;
     }
 
     // ==================== CLIENT FEEDBACK ENDPOINTS ====================
@@ -36,10 +35,10 @@ public class FeedbackController {
     @PostMapping
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<FeedbackResponseDto> createFeedback(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody CreateFeedbackRequestDto request) {
         
-        Long userId = extractUserIdFromToken(token);
+        Long userId = principal.getId();
         FeedbackResponseDto response = feedbackService.createFeedbackAsDto(
             userId, request.getReservationId(), request.getRating(), request.getComment());
         
@@ -62,11 +61,11 @@ public class FeedbackController {
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<FeedbackResponseDto> updateFeedback(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id,
             @Valid @RequestBody UpdateFeedbackRequestDto request) {
         
-        Long userId = extractUserIdFromToken(token);
+        Long userId = principal.getId();
         FeedbackResponseDto response = feedbackService.updateFeedbackAsDto(
             id, userId, request.getRating(), request.getComment());
         
@@ -79,10 +78,10 @@ public class FeedbackController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<Void> deleteFeedback(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long id) {
         
-        Long userId = extractUserIdFromToken(token);
+        Long userId = principal.getId();
         feedbackService.deleteFeedback(id, userId);
         return ResponseEntity.noContent().build();
     }
@@ -93,10 +92,10 @@ public class FeedbackController {
     @GetMapping("/my")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<Page<FeedbackResponseDto>> getMyFeedbacks(
-            @RequestHeader("Authorization") String token,
+            @AuthenticationPrincipal UserPrincipal principal,
             Pageable pageable) {
         
-        Long userId = extractUserIdFromToken(token);
+        Long userId = principal.getId();
         Page<FeedbackResponseDto> response = feedbackService.getFeedbacksByUserIdAsDto(userId, pageable);
         return ResponseEntity.ok(response);
     }
@@ -125,13 +124,5 @@ public class FeedbackController {
         
         Page<FeedbackResponseDto> response = feedbackService.searchFeedbacksAsDto(criteria, pageable);
         return ResponseEntity.ok(response);
-    }
-
-    // ==================== HELPER METHODS ====================
-
-    private Long extractUserIdFromToken(String token) {
-        String cleanToken = token.replace("Bearer ", "");
-        String email = jwtService.extractUsername(cleanToken);
-        return feedbackService.getUserIdByEmail(email);
     }
 }

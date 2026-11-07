@@ -1,8 +1,8 @@
 package com.MyBooking.loyalty.controller;
 
+import com.MyBooking.common.security.UserPrincipal;
 import com.MyBooking.loyalty.dto.*;
 import com.MyBooking.loyalty.service.LoyaltyService;
-import com.MyBooking.common.security.JwtService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -10,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -22,12 +23,10 @@ import java.math.BigDecimal;
 public class LoyaltyController {
 
     private final LoyaltyService loyaltyService;
-    private final JwtService jwtService;
 
     @Autowired
-    public LoyaltyController(LoyaltyService loyaltyService, JwtService jwtService) {
+    public LoyaltyController(LoyaltyService loyaltyService) {
         this.loyaltyService = loyaltyService;
-        this.jwtService = jwtService;
     }
 
     // ==================== CLIENT LOYALTY ENDPOINTS ====================
@@ -39,9 +38,8 @@ public class LoyaltyController {
     @GetMapping("/account")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<LoyaltyAccountResponseDto> getMyLoyaltyAccount(
-            @RequestHeader("Authorization") String authorizationHeader) {
-        String userEmail = jwtService.extractUsername(authorizationHeader.substring(7));
-        Long userId = loyaltyService.getUserIdByEmail(userEmail);
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long userId = principal.getId();
         LoyaltyAccountResponseDto response = loyaltyService.getLoyaltyAccountByUserIdAsDto(userId);
         return ResponseEntity.ok(response);
     }
@@ -53,9 +51,8 @@ public class LoyaltyController {
     @PostMapping("/account")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<LoyaltyAccountResponseDto> createMyLoyaltyAccount(
-            @RequestHeader("Authorization") String authorizationHeader) {
-        String userEmail = jwtService.extractUsername(authorizationHeader.substring(7));
-        Long userId = loyaltyService.getUserIdByEmail(userEmail);
+            @AuthenticationPrincipal UserPrincipal principal) {
+        Long userId = principal.getId();
         LoyaltyAccountResponseDto response = loyaltyService.createLoyaltyAccountAsDto(userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -67,10 +64,9 @@ public class LoyaltyController {
     @GetMapping("/transactions")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<Page<LoyaltyTransactionResponseDto>> getMyTransactions(
-            @RequestHeader("Authorization") String authorizationHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             Pageable pageable) {
-        String userEmail = jwtService.extractUsername(authorizationHeader.substring(7));
-        Long userId = loyaltyService.getUserIdByEmail(userEmail);
+        Long userId = principal.getId();
         Page<LoyaltyTransactionResponseDto> transactions = loyaltyService.getTransactionsByUserIdAsDto(userId, pageable);
         return ResponseEntity.ok(transactions);
     }
@@ -82,10 +78,9 @@ public class LoyaltyController {
     @PostMapping("/redeem")
     @PreAuthorize("hasRole('CLIENT')")
     public ResponseEntity<LoyaltyTransactionResponseDto> redeemPoints(
-            @RequestHeader("Authorization") String authorizationHeader,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody RedeemPointsRequestDto request) {
-        String userEmail = jwtService.extractUsername(authorizationHeader.substring(7));
-        Long userId = loyaltyService.getUserIdByEmail(userEmail);
+        Long userId = principal.getId();
         // For client operations, ignore the userId in the request and use the authenticated user's ID
         LoyaltyTransactionResponseDto response = loyaltyService.redeemPointsAsDto(
                 userId, request.getPoints(), request.getReason());

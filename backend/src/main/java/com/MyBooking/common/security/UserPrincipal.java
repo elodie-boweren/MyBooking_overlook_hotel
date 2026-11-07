@@ -1,12 +1,14 @@
 package com.MyBooking.common.security;
 
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.io.Serial;
 import java.io.Serializable;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -22,6 +24,10 @@ public class UserPrincipal implements UserDetails, Serializable {
     private final String email;
     private final String role;
     private final Collection<? extends GrantedAuthority> authorities;
+
+    public UserPrincipal(Long id, String email, String role) {
+        this(id, email, role, role != null ? List.of(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase())) : Collections.emptyList());
+    }
 
     public UserPrincipal(Long id, String email, String role, Collection<? extends GrantedAuthority> authorities) {
         this.id = id;

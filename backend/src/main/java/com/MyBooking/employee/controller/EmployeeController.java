@@ -1,5 +1,6 @@
 package com.MyBooking.employee.controller;
 
+import com.MyBooking.common.security.UserPrincipal;
 import com.MyBooking.employee.dto.*;
 import com.MyBooking.employee.service.EmployeeService;
 import com.MyBooking.employee.domain.*;
@@ -9,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
@@ -26,7 +28,8 @@ public class EmployeeController {
     // ==================== EMPLOYEE PROFILE ====================
 
     @GetMapping("/profile")
-    public ResponseEntity<EmployeeResponseDto> getMyProfile(@RequestHeader("X-User-Id") Long userId) {
+    public ResponseEntity<EmployeeResponseDto> getMyProfile(@AuthenticationPrincipal UserPrincipal principal) {
+        Long userId = principal.getId();
         Employee employee = employeeService.getEmployeeByUserId(userId);
         EmployeeResponseDto response = convertToEmployeeResponseDto(employee);
         return ResponseEntity.ok(response);
@@ -36,9 +39,10 @@ public class EmployeeController {
 
     @GetMapping("/tasks")
     public ResponseEntity<Page<TaskResponseDto>> getMyTasks(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) TaskStatus status,
             Pageable pageable) {
+        Long userId = principal.getId();
         Page<EmployeeTask> tasks = employeeService.getEmployeeTasks(userId, status, pageable);
         Page<TaskResponseDto> response = tasks.map(this::convertToTaskResponseDto);
         return ResponseEntity.ok(response);
@@ -46,9 +50,10 @@ public class EmployeeController {
 
     @PutMapping("/tasks/{taskId}")
     public ResponseEntity<TaskResponseDto> updateMyTask(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long taskId,
             @Valid @RequestBody TaskUpdateRequestDto request) {
+        Long userId = principal.getId();
         // Verify the task belongs to this employee
         EmployeeTask task = employeeService.getEmployeeTasks(userId, null, Pageable.unpaged())
                 .getContent()
@@ -66,8 +71,9 @@ public class EmployeeController {
 
     @PostMapping("/leave-requests")
     public ResponseEntity<LeaveRequestResponseDto> createLeaveRequest(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody LeaveRequestCreateRequestDto request) {
+        Long userId = principal.getId();
         LeaveRequest leaveRequest = employeeService.createLeaveRequest(userId, request.getFromDate(), request.getToDate(), request.getReason());
         LeaveRequestResponseDto response = convertToLeaveRequestResponseDto(leaveRequest);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -75,9 +81,10 @@ public class EmployeeController {
 
     @GetMapping("/leave-requests")
     public ResponseEntity<Page<LeaveRequestResponseDto>> getMyLeaveRequests(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) LeaveRequestStatus status,
             Pageable pageable) {
+        Long userId = principal.getId();
         Page<LeaveRequest> requests = employeeService.getEmployeeLeaveRequests(userId, status, pageable);
         Page<LeaveRequestResponseDto> response = requests.map(this::convertToLeaveRequestResponseDto);
         return ResponseEntity.ok(response);
@@ -87,9 +94,10 @@ public class EmployeeController {
 
     @GetMapping("/trainings")
     public ResponseEntity<Page<EmployeeTrainingResponseDto>> getMyTrainings(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @RequestParam(required = false) TrainingStatus status,
             Pageable pageable) {
+        Long userId = principal.getId();
         Page<EmployeeTraining> trainings = employeeService.getEmployeeTrainings(userId, status, pageable);
         Page<EmployeeTrainingResponseDto> response = trainings.map(this::convertToEmployeeTrainingResponseDto);
         return ResponseEntity.ok(response);
@@ -97,9 +105,10 @@ public class EmployeeController {
 
     @PutMapping("/trainings/{trainingId}/status")
     public ResponseEntity<EmployeeTrainingResponseDto> updateMyTrainingStatus(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable Long trainingId,
             @Valid @RequestBody EmployeeTrainingUpdateRequestDto request) {
+        Long userId = principal.getId();
         EmployeeTraining employeeTraining = employeeService.updateEmployeeTrainingStatus(userId, trainingId, request.getStatus());
         EmployeeTrainingResponseDto response = convertToEmployeeTrainingResponseDto(employeeTraining);
         return ResponseEntity.ok(response);
@@ -109,8 +118,9 @@ public class EmployeeController {
 
     @GetMapping("/shifts")
     public ResponseEntity<Page<ShiftResponseDto>> getMyShifts(
-            @RequestHeader("X-User-Id") Long userId,
+            @AuthenticationPrincipal UserPrincipal principal,
             Pageable pageable) {
+        Long userId = principal.getId();
         Page<Shift> shifts = employeeService.getEmployeeShifts(userId, pageable);
         Page<ShiftResponseDto> response = shifts.map(this::convertToShiftResponseDto);
         return ResponseEntity.ok(response);
@@ -119,7 +129,8 @@ public class EmployeeController {
     // ==================== AVAILABILITY CHECKS ====================
 
     @GetMapping("/availability")
-    public ResponseEntity<EmployeeAvailabilityDto> checkMyAvailability(@RequestHeader("X-User-Id") Long userId) {
+    public ResponseEntity<EmployeeAvailabilityDto> checkMyAvailability(@AuthenticationPrincipal UserPrincipal principal) {
+        Long userId = principal.getId();
         boolean available = employeeService.isEmployeeAvailableForTask(userId);
         Employee employee = employeeService.getEmployeeByUserId(userId);
         

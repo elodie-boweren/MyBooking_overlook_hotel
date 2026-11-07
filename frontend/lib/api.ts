@@ -67,16 +67,13 @@ class ApiClient {
   private async request<T>(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<T> {
     const url = `${this.baseURL}${endpoint}`
 
-    // Get token and user ID from localStorage
+    // Get token from localStorage
     const token = typeof window !== "undefined" ? localStorage.getItem("token") : null
-    const userStr = typeof window !== "undefined" ? localStorage.getItem("user") : null
-    const user = userStr ? JSON.parse(userStr) : null
 
     const config: RequestInit = {
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
-        ...(user?.id && { "X-User-Id": user.id }),
         ...options.headers,
       },
       ...options,

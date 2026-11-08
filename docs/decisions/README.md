@@ -33,7 +33,7 @@ This register documents all Architecture Decision Records (ADRs) for the MyBooki
 | **ADR-0017** | [Multi-Tenant Authorization Model & Policy Architecture (RBAC + ReBAC + ABAC)](ADR-0017-authorization-model-and-multitenant-permission-architecture.md) | Authorization & Policy | **Accepted** | Phase 02 / Phase 04 / Phase 08 |
 | **ADR-0019** | [Gateway Internal Delegation Token Architecture (Downstream Service Identity Propagation)](ADR-0019-gateway-internal-delegation-token-architecture.md) | Ingress & Delegation | **Accepted** | Phase 07 |
 | **ADR-0020** | [Two-Layer Audit Architecture (ClickHouse Operational Analytics & S3 Object Lock WORM Archival)](ADR-0020-s3-object-lock-and-audit-retention.md) | Audit & Compliance | **Accepted** | Phase 10 |
-| **ADR-0021** | [Public Resource Identifier Architecture (Public UUIDv7 Defense-in-Depth & Anti-Enumeration)](ADR-0021-public-uuid-defense-in-depth-anti-enumeration.md) | API Security & Data Modeling | **Accepted** | Phase 03 |
+| **ADR-0021** | [Public Resource Identifier Architecture (Public UUIDv7 Defense-in-Depth & Anti-Enumeration)](ADR-0021-public-uuid-defense-in-depth-anti-enumeration.md) | API Security & Data Modeling | **Accepted** | Milestone IdP |
 
 ---
 

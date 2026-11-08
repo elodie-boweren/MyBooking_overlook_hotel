@@ -10,7 +10,7 @@ This document serves as the authoritative architectural baseline and Trello back
 PHASE 01: Repository Consolidation & Test Harness Repair
 PHASE 02: Zero-Trust Security & Authentication Hardening
 PHASE 03: Domain Refactoring & Reservation Core Fixes
-MILESTONE IdP: Keycloak Identity Provider Adoption & Next.js BFF Architecture
+MILESTONE IdP: Keycloak Identity Provider Adoption, Next.js BFF & Public UUIDv7 Architecture
 PHASE 04: Modular Monolith Bounded Contexts & PostgreSQL Schema Isolation
 PHASE 05: Transactional Outbox & In-Memory Domain Events
 PHASE 06: C++20 Dynamic Pricing & Yield Engine Integration (gRPC)
@@ -47,10 +47,10 @@ PHASE 15: Kubernetes DevSecOps Deployment & Production Hardening
 * **Deliverables**: Interval overlap tests passing, back-to-back booking support.
 * **Dependencies**: Phase 02.
 
-### MILESTONE IdP: Keycloak Identity Provider Adoption & Next.js BFF Architecture
-* **Objective**: Adopt Keycloak as centralized OAuth2/OIDC authority, eliminate browser token storage via Next.js BFF, migrate user credentials with forced password reset, and enable asymmetric JWKS token verification.
-* **Scope**: Docker Compose Keycloak deployment, realm-as-code configuration (`mybooking-platform`), user account migration preserving `app_user.id`, Next.js BFF server routes with `HttpOnly` session cookies, Spring Security Resource Server JWKS integration, positive/negative integration tests.
-* **Deliverables**: Self-hosted Keycloak service, asymmetric RS256/ES256 verification, zero `localStorage` tokens, ADR-0016.
+### MILESTONE IdP: Keycloak Identity Provider Adoption, Next.js BFF & Public UUIDv7 Architecture
+* **Objective**: Adopt Keycloak as centralized OAuth2/OIDC authority, eliminate browser token storage via Next.js BFF, migrate user credentials with forced password reset, enable asymmetric JWKS token verification, and implement the Dual-Key Public UUIDv7 pattern (ADR-0021) for defense-in-depth and anti-enumeration.
+* **Scope**: Docker Compose Keycloak deployment, realm-as-code configuration (`mybooking-platform`), user account migration preserving `app_user.id`, Next.js BFF server routes with encrypted `HttpOnly` session cookies, Spring Security Resource Server JWKS integration, `public_id UUID` (UUIDv7) schema and entity integration across core aggregates (`User`, `Room`, `Reservation`, `Feedback`, `Event`), dual-lookup repository support, DTO contract exposure, positive/negative integration tests.
+* **Deliverables**: Self-hosted Keycloak service, asymmetric RS256/ES256 verification, zero `localStorage` tokens, non-enumerable public UUIDv7 endpoints, ADR-0004, ADR-0016, ADR-0021.
 * **Dependencies**: Phase 03.
 
 ### PHASE 04: Modular Monolith Bounded Contexts & PostgreSQL Schema Isolation

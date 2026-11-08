@@ -18,7 +18,7 @@ We must define an architecture for public-facing identifiers that provides non-e
 * **Database Indexing Performance**: Avoid random UUIDv4 write penalties, B-tree index fragmentation, and buffer-pool thrashing in PostgreSQL.
 * **Separation of Concerns (Internal vs. External)**: Internal database joins, foreign keys, and storage optimizations must remain decoupled from external API representation.
 * **Standards Alignment**: Adhere to RFC 9562 (UUID Version 7: time-ordered 128-bit identifiers).
-* **Controlled Phasing**: Schedule adoption for **Phase 03 (Next.js BFF & API Contract Hardening)**, ensuring Phase 02 completes its zero-trust authorization hardening without disruptive database schema churn.
+* **Controlled Phasing**: Schedule adoption for **MILESTONE IdP (Keycloak IdP, Next.js BFF & Public UUIDv7 Architecture)** immediately following Phase 03 domain refactoring and prior to Phase 04 schema isolation, ensuring Phase 02 and Phase 03 complete without disruptive schema churn.
 
 ## Considered Options
 1. **Option 1: Expose Sequential Integer Primary Keys (`BIGINT id`) Directly**:

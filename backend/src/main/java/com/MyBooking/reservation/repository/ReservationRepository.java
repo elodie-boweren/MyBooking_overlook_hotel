@@ -203,22 +203,35 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     // ==================== AVAILABILITY QUERIES ====================
     
     /**
-     * Check if a room is available for the given date range.
+     * Check if a room is available for the given date range, optionally excluding a reservation ID.
      * Returns conflicting reservations if any exist.
+     * 
+     * @param roomId The room to check
+     * @param checkIn Start date of the requested period
+     * @param checkOut End date of the requested period
+     * @param excludeReservationId Optional reservation ID to exclude (e.g., during update)
+     * @return List of conflicting reservations (empty if room is available)
+     */
+    @Query("SELECT r FROM Reservation r WHERE r.room.id = :roomId " +
+           "AND r.status = 'CONFIRMED' " +
+           "AND (:excludeReservationId IS NULL OR r.id != :excludeReservationId) " +
+           "AND (r.checkIn < :checkOut AND r.checkOut > :checkIn)")
+    List<Reservation> checkRoomAvailability(@Param("roomId") Long roomId,
+                                           @Param("checkIn") LocalDate checkIn,
+                                           @Param("checkOut") LocalDate checkOut,
+                                           @Param("excludeReservationId") Long excludeReservationId);
+
+    /**
+     * Check if a room is available for the given date range (convenience overload).
      * 
      * @param roomId The room to check
      * @param checkIn Start date of the requested period
      * @param checkOut End date of the requested period
      * @return List of conflicting reservations (empty if room is available)
      */
-    @Query("SELECT r FROM Reservation r WHERE r.room.id = :roomId " +
-           "AND r.status = 'CONFIRMED' " +
-           "AND ((r.checkIn <= :checkIn AND r.checkOut > :checkIn) OR " +
-           "     (r.checkIn < :checkOut AND r.checkOut >= :checkOut) OR " +
-           "     (r.checkIn >= :checkIn AND r.checkOut <= :checkOut))")
-    List<Reservation> checkRoomAvailability(@Param("roomId") Long roomId,
-                                           @Param("checkIn") LocalDate checkIn,
-                                           @Param("checkOut") LocalDate checkOut);
+    default List<Reservation> checkRoomAvailability(Long roomId, LocalDate checkIn, LocalDate checkOut) {
+        return checkRoomAvailability(roomId, checkIn, checkOut, null);
+    }
     
     /**
      * Find all reservations that overlap with the given date range.
@@ -228,9 +241,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * @return List of overlapping reservations
      */
     @Query("SELECT r FROM Reservation r WHERE r.status = 'CONFIRMED' " +
-           "AND ((r.checkIn <= :checkIn AND r.checkOut > :checkIn) OR " +
-           "     (r.checkIn < :checkOut AND r.checkOut >= :checkOut) OR " +
-           "     (r.checkIn >= :checkIn AND r.checkOut <= :checkOut))")
+           "AND (r.checkIn < :checkOut AND r.checkOut > :checkIn)")
     List<Reservation> findOverlappingReservations(@Param("checkIn") LocalDate checkIn,
                                                   @Param("checkOut") LocalDate checkOut);
     
@@ -243,9 +254,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * @return Page of overlapping reservations
      */
     @Query("SELECT r FROM Reservation r WHERE r.status = 'CONFIRMED' " +
-           "AND ((r.checkIn <= :checkIn AND r.checkOut > :checkIn) OR " +
-           "     (r.checkIn < :checkOut AND r.checkOut >= :checkOut) OR " +
-           "     (r.checkIn >= :checkIn AND r.checkOut <= :checkOut))")
+           "AND (r.checkIn < :checkOut AND r.checkOut > :checkIn)")
     Page<Reservation> findOverlappingReservations(@Param("checkIn") LocalDate checkIn,
                                                   @Param("checkOut") LocalDate checkOut,
                                                   Pageable pageable);

@@ -406,10 +406,7 @@ public class ReservationService {
      * Check room availability for reservation update (excluding current reservation)
      */
     private void checkRoomAvailabilityForUpdate(Long roomId, LocalDate checkIn, LocalDate checkOut, Long excludeReservationId) {
-        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut);
-        
-        // Remove the current reservation from conflicts
-        conflicts.removeIf(r -> r.getId().equals(excludeReservationId));
+        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut, excludeReservationId);
         
         if (!conflicts.isEmpty()) {
             throw new BusinessRuleException("Room is not available for the selected dates. " +

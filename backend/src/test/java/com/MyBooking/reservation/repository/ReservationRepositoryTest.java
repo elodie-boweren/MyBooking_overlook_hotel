@@ -364,6 +364,63 @@ class ReservationRepositoryTest {
     }
 
     @Test
+    void testCheckRoomAvailability_BackToBackArrival_Allowed() {
+        // When - Check-in on the exact day existing reservation checks out (2024-01-20)
+        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(
+            room1.getId(), LocalDate.of(2024, 1, 20), LocalDate.of(2024, 1, 25)
+        );
+
+        // Then - Should NOT conflict (half-open interval [2024-01-15, 2024-01-20) does not overlap [2024-01-20, 2024-01-25))
+        assertThat(conflicts).isEmpty();
+    }
+
+    @Test
+    void testCheckRoomAvailability_BackToBackDeparture_Allowed() {
+        // When - Check-out on the exact day existing reservation checks in (2024-01-15)
+        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(
+            room1.getId(), LocalDate.of(2024, 1, 10), LocalDate.of(2024, 1, 15)
+        );
+
+        // Then - Should NOT conflict
+        assertThat(conflicts).isEmpty();
+    }
+
+    @Test
+    void testCheckRoomAvailability_EnclosingInterval_Conflict() {
+        // When - Check requested range that completely wraps the existing reservation
+        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(
+            room1.getId(), LocalDate.of(2024, 1, 10), LocalDate.of(2024, 1, 25)
+        );
+
+        // Then - Must detect conflict with reservation1
+        assertThat(conflicts).hasSize(1);
+        assertThat(conflicts.get(0).getId()).isEqualTo(reservation1.getId());
+    }
+
+    @Test
+    void testCheckRoomAvailability_WithExcludeReservationId_NoSelfConflict() {
+        // When - Updating reservation1 with identical or overlapping dates, excluding reservation1's ID
+        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(
+            room1.getId(), LocalDate.of(2024, 1, 15), LocalDate.of(2024, 1, 20), reservation1.getId()
+        );
+
+        // Then - Should be empty because reservation1 is excluded from conflict check
+        assertThat(conflicts).isEmpty();
+    }
+
+    @Test
+    void testCheckRoomAvailability_WithExcludeDifferentReservationId_DetectsConflict() {
+        // When - Checking same dates excluding an unrelated reservation ID
+        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(
+            room1.getId(), LocalDate.of(2024, 1, 15), LocalDate.of(2024, 1, 20), 9999L
+        );
+
+        // Then - Should detect reservation1 as conflict
+        assertThat(conflicts).hasSize(1);
+        assertThat(conflicts.get(0).getId()).isEqualTo(reservation1.getId());
+    }
+
+    @Test
     void testFindOverlappingReservations() {
         // When
         List<Reservation> overlapping = reservationRepository.findOverlappingReservations(

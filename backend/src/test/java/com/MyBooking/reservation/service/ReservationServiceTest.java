@@ -269,7 +269,7 @@ class ReservationServiceTest {
         LocalDate newCheckOut = LocalDate.now().plusDays(7);
         
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
-        when(reservationRepository.checkRoomAvailability(1L, newCheckIn, newCheckOut))
+        when(reservationRepository.checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L))
             .thenReturn(Collections.emptyList());
         when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
         
@@ -282,7 +282,7 @@ class ReservationServiceTest {
         assertThat(result.getCheckOut()).isEqualTo(newCheckOut);
         
         verify(reservationRepository).findById(1L);
-        verify(reservationRepository).checkRoomAvailability(1L, newCheckIn, newCheckOut);
+        verify(reservationRepository).checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L);
         verify(reservationRepository).save(testReservation);
     }
 
@@ -297,6 +297,28 @@ class ReservationServiceTest {
             .hasMessageContaining("Reservation not found with ID: 1");
         
         verify(reservationRepository).findById(1L);
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void updateReservation_WithConflictingDates_ShouldThrowBusinessRuleException() {
+        // Given
+        LocalDate newCheckIn = LocalDate.now().plusDays(5);
+        LocalDate newCheckOut = LocalDate.now().plusDays(7);
+        Reservation conflictingReservation = new Reservation();
+        conflictingReservation.setId(99L);
+        
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L))
+            .thenReturn(List.of(conflictingReservation));
+        
+        // When & Then
+        assertThatThrownBy(() -> reservationService.updateReservation(1L, newCheckIn, newCheckOut, 2, "USD"))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Room is not available for the selected dates");
+        
+        verify(reservationRepository).findById(1L);
+        verify(reservationRepository).checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L);
         verify(reservationRepository, never()).save(any());
     }
 

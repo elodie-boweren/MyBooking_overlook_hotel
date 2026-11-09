@@ -160,9 +160,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     @Query("SELECT r FROM Room r WHERE r.status = 'AVAILABLE' AND r.id NOT IN " +
            "(SELECT res.room.id FROM Reservation res WHERE " +
            "res.status = 'CONFIRMED' AND " +
-           "((res.checkIn <= :checkIn AND res.checkOut > :checkIn) OR " +
-           "(res.checkIn < :checkOut AND res.checkOut >= :checkOut) OR " +
-           "(res.checkIn >= :checkIn AND res.checkOut <= :checkOut)))")
+           "(res.checkIn < :checkOut AND res.checkOut > :checkIn))")
     List<Room> findAvailableRoomsForDateRange(
             @Param("checkIn") LocalDate checkIn,
             @Param("checkOut") LocalDate checkOut
@@ -181,9 +179,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     @Query("SELECT r FROM Room r WHERE r.status = 'AVAILABLE' AND r.id NOT IN " +
            "(SELECT res.room.id FROM Reservation res WHERE " +
            "res.status = 'CONFIRMED' AND " +
-           "((res.checkIn <= :checkIn AND res.checkOut > :checkIn) OR " +
-           "(res.checkIn < :checkOut AND res.checkOut >= :checkOut) OR " +
-           "(res.checkIn >= :checkIn AND res.checkOut <= :checkOut))) AND " +
+           "(res.checkIn < :checkOut AND res.checkOut > :checkIn)) AND " +
            "(:roomType IS NULL OR r.roomType = :roomType) AND " +
            "(:minCapacity IS NULL OR r.capacity >= :minCapacity)")
     List<Room> findAvailableRooms(
@@ -205,9 +201,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
     @Query("SELECT r FROM Room r WHERE r.status = 'AVAILABLE' AND r.id NOT IN " +
            "(SELECT res.room.id FROM Reservation res WHERE " +
            "res.status = 'CONFIRMED' AND " +
-           "((res.checkIn <= :checkIn AND res.checkOut > :checkIn) OR " +
-           "(res.checkIn < :checkOut AND res.checkOut >= :checkOut) OR " +
-           "(res.checkIn >= :checkIn AND res.checkOut <= :checkOut)))")
+           "(res.checkIn < :checkOut AND res.checkOut > :checkIn))")
     Page<Room> findAvailableRoomsForDateRange(
             @Param("checkIn") LocalDate checkIn,
             @Param("checkOut") LocalDate checkOut,
@@ -230,9 +224,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
            "(:minCapacity IS NULL OR r.capacity >= :minCapacity) AND " +
            "r.id NOT IN (SELECT res.room.id FROM Reservation res WHERE " +
            "res.status = 'CONFIRMED' AND " +
-           "((res.checkIn <= :checkIn AND res.checkOut > :checkIn) OR " +
-           "(res.checkIn < :checkOut AND res.checkOut >= :checkOut) OR " +
-           "(res.checkIn >= :checkIn AND res.checkOut <= :checkOut)))")
+           "(res.checkIn < :checkOut AND res.checkOut > :checkIn))")
     Page<Room> findAvailableRoomsForDateRangeWithFilters(
             @Param("checkIn") LocalDate checkIn,
             @Param("checkOut") LocalDate checkOut,

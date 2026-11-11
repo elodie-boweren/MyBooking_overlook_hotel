@@ -132,6 +132,21 @@ class FeedbackServiceTest {
     }
 
     @Test
+    void createFeedback_WithCancelledReservation_ShouldThrowBusinessRuleException() {
+        // Given
+        testReservation.setStatus(com.MyBooking.reservation.domain.ReservationStatus.CANCELLED);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testClient));
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+
+        // When / Then
+        BusinessRuleException exception = assertThrows(BusinessRuleException.class, () ->
+            feedbackService.createFeedback(1L, 1L, 5, "Cancelled stay"));
+
+        assertThat(exception.getMessage()).contains("Cannot provide feedback for a cancelled reservation");
+        verify(feedbackRepository, never()).save(any(Feedback.class));
+    }
+
+    @Test
     void createFeedback_WithNonClientUser_ShouldThrowBusinessRuleException() {
         // Given
         User employee = new User("Employee", "User", "employee@hotel.com", "password", "1111111111", "Employee Office", LocalDate.of(1990, 1, 1), Role.EMPLOYEE);

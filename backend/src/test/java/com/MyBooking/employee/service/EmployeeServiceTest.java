@@ -312,6 +312,25 @@ class EmployeeServiceTest {
     }
 
     @Test
+    void createTask_WithEmployeeOnApprovedLeave_ShouldThrowBusinessRuleException() {
+        // Given
+        LeaveRequest approvedLeave = new LeaveRequest(testUser, LocalDate.now().minusDays(1), LocalDate.now().plusDays(2),
+                LeaveRequestStatus.APPROVED, "Medical leave");
+        when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
+        when(employeeTrainingRepository.existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS))
+            .thenReturn(false);
+        when(leaveRequestRepository.findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED))
+            .thenReturn(Arrays.asList(approvedLeave));
+
+        // When & Then
+        assertThatThrownBy(() -> employeeService.createTask(1L, "Clean Room 101", "Deep clean room 101"))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Cannot assign task to employee currently on approved leave");
+
+        verify(employeeTaskRepository, never()).save(any());
+    }
+
+    @Test
     void updateTaskStatus_WithValidTask_ShouldUpdateTask() {
         // Given
         when(employeeTaskRepository.findById(1L)).thenReturn(Optional.of(testTask));
@@ -639,6 +658,51 @@ class EmployeeServiceTest {
         assertThat(result).isFalse();
         verify(employeeRepository).findByUserId(1L);
         verify(employeeTrainingRepository, never()).existsByEmployeeAndStatus(any(), any());
+    }
+
+    @Test
+    void isEmployeeAvailableForTask_WithApprovedLeave_ShouldReturnFalse() {
+        // Given
+        LeaveRequest approvedLeave = new LeaveRequest(testUser, LocalDate.now().minusDays(1), LocalDate.now().plusDays(2),
+                LeaveRequestStatus.APPROVED, "Vacation");
+        when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
+        when(employeeTrainingRepository.existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS))
+            .thenReturn(false);
+        when(leaveRequestRepository.findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED))
+            .thenReturn(Arrays.asList(approvedLeave));
+
+        // When
+        boolean result = employeeService.isEmployeeAvailableForTask(1L);
+
+        // Then
+        assertThat(result).isFalse();
+    }
+
+    @Test
+    void updateShift_WithValidExclusion_ShouldUpdateShift() {
+        // Given
+        LocalDateTime startAt = LocalDateTime.now().plusDays(2).withHour(9).withMinute(0);
+        LocalDateTime endAt = LocalDateTime.now().plusDays(2).withHour(17).withMinute(0);
+        Shift existingShift = new Shift(testUser, startAt, endAt);
+        existingShift.setId(10L);
+
+        when(shiftRepository.findById(10L)).thenReturn(Optional.of(existingShift));
+        when(shiftRepository.findOverlappingShiftsForEmployeeIdExcludingShiftId(startAt, endAt, 1L, 10L))
+            .thenReturn(Collections.emptyList());
+        when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
+        when(employeeTrainingRepository.existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS))
+            .thenReturn(false);
+        when(leaveRequestRepository.findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED))
+            .thenReturn(Collections.emptyList());
+        when(shiftRepository.save(any(Shift.class))).thenReturn(existingShift);
+
+        // When
+        Shift updated = employeeService.updateShift(10L, startAt, endAt);
+
+        // Then
+        assertThat(updated).isNotNull();
+        verify(shiftRepository).findOverlappingShiftsForEmployeeIdExcludingShiftId(startAt, endAt, 1L, 10L);
+        verify(shiftRepository).save(existingShift);
     }
 
     // ========== STATISTICS TESTS ==========

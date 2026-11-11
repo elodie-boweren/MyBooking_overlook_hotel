@@ -5,8 +5,8 @@
 - **Feature Branch**: `feature/phase-3-domain-refactoring`
 - **Execution Date**: November 2026
 - **Status**: **ACCEPTED & READY FOR PHASE 3 SIGN-OFF**
-- **Test Suite Status**: **1,156 / 1,156 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
-- **Authoritative Invariants**: `INV-RES-001`, `INV-RES-002`, `INV-RES-003`, `INV-ROOM-001`, `INV-EVT-001`, `INV-EVT-002`, `INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003` (documented in `docs/architecture/domain-invariants.md`)
+- **Test Suite Status**: **1,160 / 1,160 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
+- **Authoritative Invariants**: `INV-RES-001`, `INV-RES-002`, `INV-RES-003`, `INV-ROOM-001`, `INV-EVT-001`, `INV-EVT-002`, `INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`, `INV-EMP-001`, `INV-EMP-002` (documented in `docs/architecture/domain-invariants.md`)
 
 ---
 
@@ -21,7 +21,8 @@
    - [P3-T01: Reservation Date Overlap Math & Self-Conflict Exemption](#p3-t01-reservation-date-overlap-math--self-conflict-exemption)
    - [P3-T02: Decoupling Physical Room Status from Dynamic Booking Availability](#p3-t02-decoupling-physical-room-status-from-dynamic-booking-availability)
    - [P3-T03: Event Participant Capacity Aggregation & Overbooking Prevention](#p3-t03-event-participant-capacity-aggregation--overbooking-prevention)
-   - [P3-T04: Loyalty Points Post-Stay Accrual, Cancellation Clawback & Concurrency Hardening (Upcoming)](#p3-t04-loyalty-points-post-stay-accrual-cancellation-clawback--concurrency-hardening-upcoming)
+   - [P3-T04: Loyalty Points Post-Stay Accrual, Cancellation Clawback & Concurrency Hardening](#p3-t04-loyalty-points-post-stay-accrual-cancellation-clawback--concurrency-hardening)
+   - [P3-T05: Employee Leave Integrity, Shift Overlap & Feedback Status Guard](#p3-t05-employee-leave-integrity-shift-overlap--feedback-status-guard)
 5. [Source Code Implementations of Key Components](#5-source-code-implementations-of-key-components)
 6. [Complete Test Harness & Verification Suite](#6-complete-test-harness--verification-suite)
 7. [Test Execution Results & Performance Metrics](#7-test-execution-results--performance-metrics)
@@ -180,9 +181,11 @@ While `@Version` serves as the optimal primary concurrency mechanism for normal 
 | `INV-ROOM-001`| Room Inventory | **Decoupled Availability Rule**: Booking availability is derived solely from the reservation calendar, not physical room status (`OCCUPIED`). Physical status only blocks bookings when `OUT_OF_SERVICE`. | `P3-T02` | `ReservationService.createReservation`, `RoomRepository.findAvailableRooms` | `ReservationServiceTest`, `RoomRepositoryTest` |
 | `INV-EVT-001` | Event | **Cumulative Participant Capacity Rule**: Total confirmed participants `SUM(numberOfParticipants)` plus incoming request must not exceed `event.maxParticipants`. | `P3-T03` | `EventBookingRepository.countConfirmedParticipantsByEventId`, `EventService` | `EventBookingRepositoryTest`, `EventServiceTest` |
 | `INV-EVT-002` | Event | **Future Event Booking Rule**: Event bookings can only be created for events whose `startDate` is strictly in the future (`startDate.isAfter(now)`). | `P3-T03` | `EventService.createEventBookingAsDto` | `EventServiceTest.createEventBooking_PastEvent_ThrowsBusinessRuleException` |
-| `INV-LOY-001` | Loyalty | **Post-Stay Accrual Rule**: Loyalty points are awarded strictly upon successful guest checkout (`status == CHECKED_OUT`), never at reservation creation. | `P3-T04` | `LoyaltyService.accruePointsForReservation` | *P3-T04 Test Suite* |
-| `INV-LOY-002` | Loyalty | **Cancellation Clawback Rule**: Cancelled or refunded reservations must deduct or reverse pending points, preventing negative balances. | `P3-T04` | `LoyaltyService.clawbackPointsForReservation` | *P3-T04 Test Suite* |
-| `INV-LOY-003` | Loyalty | **Atomic Balance Concurrency**: Loyalty account balances must be updated using atomic row-level locks or transactional compare-and-swap. | `P3-T04` | `LoyaltyRepository.findByIdForUpdate` | *P3-T04 Test Suite* |
+| `INV-LOY-001` | Loyalty | **Non-Negative Balance Rule**: Loyalty account balance must never drop below zero; protected by `@Version` optimistic locking. | `P3-T04` | `LoyaltyAccount`, `LoyaltyService` | `LoyaltyAccountTest`, `LoyaltyServiceTest` |
+| `INV-LOY-002` | Loyalty | **Cancellation Clawback & 1:1 Refund**: Points earned are clawed back upon cancellation; redeemed points are refunded 1:1. | `P3-T04` | `LoyaltyService.clawbackReservationPoints`, `refundReservationPoints` | `LoyaltyServiceTest`, `ReservationServiceTest` |
+| `INV-LOY-003` | Loyalty | **Immutable Ledger Types**: Append-only ledger supporting `EARN`, `REDEEM`, `REFUND`, and `CLAWBACK`. | `P3-T04` | `LoyaltyTxType`, `LoyaltyTransaction` | `LoyaltyTransactionTest` |
+| `INV-EMP-001` | Staff Operations | **Leave Exclusivity Rule**: Employees cannot be scheduled for shifts or assigned tasks during approved leave dates. | `P3-T05` | `EmployeeService.createTask`, `isEmployeeAvailableForTask` | `EmployeeServiceTest` |
+| `INV-EMP-002` | Staff Operations | **Shift Non-Overlap Rule**: Shifts cannot overlap existing active shifts for an employee; update excludes target shift ID. | `P3-T05` | `ShiftRepository.findOverlappingShiftsForEmployeeIdExcludingShiftId` | `EmployeeServiceTest`, `ShiftRepositoryTest` |
 
 ---
 
@@ -226,6 +229,17 @@ While `@Version` serves as the optimal primary concurrency mechanism for normal 
   - Re-implemented `refundReservationPoints` to restore points 1:1 directly into `account.balance` and record a `REFUND` ledger transaction.
   - Implemented `clawbackReservationPoints(Long reservationId)` in `LoyaltyService` and wired it into `ReservationService.cancelReservation`, ensuring points are clawed back with `INV-LOY-001` non-negative balance protection (`Math.max(0, balance - earnedPoints)`).
   - Added 6 comprehensive test cases verifying 1:1 refund, clawback, balance floor at 0, idempotency, and dual refund+clawback cancellation orchestration.
+
+### P3-T05: Employee Leave Integrity, Shift Overlap & Feedback Status Guard
+- **Problem**:
+  1. *Task Assignment on Leave (`INV-EMP-001`, `AUD-EMP-001`)*: `createTask` and `isEmployeeAvailableForTask` completely ignored approved employee leaves. An employee on approved medical or parental leave could still be assigned tasks.
+  2. *Shift Self-Collision In-Memory Filter*: `updateShift` fetched all overlapping shifts and used an in-memory `removeIf(s -> s.getId().equals(shiftId))` filter.
+  3. *Feedback on Cancelled Bookings (`AUD-FDBK-001`)*: `FeedbackService.validateFeedbackCreation` only checked that the checkout date had passed, but never checked `reservation.getStatus() == CANCELLED`.
+- **Solution**:
+  - Enforced `INV-EMP-001` in `EmployeeService.createTask` and `isEmployeeAvailableForTask(id, date)`: queries `leaveRequestRepository.findByEmployeeAndStatus(employee, APPROVED)` and blocks assignments on approved leave dates.
+  - Added `findOverlappingShiftsForEmployeeIdExcludingShiftId` with `:excludeShiftId IS NULL OR s.id != :excludeShiftId` in `ShiftRepository`, replacing the `removeIf` in `EmployeeService.updateShift`.
+  - Added `reservation.getStatus() == ReservationStatus.CANCELLED` check in `FeedbackService.validateFeedbackCreation`, blocking invalid reviews.
+  - Added unit test cases across `EmployeeServiceTest` and `FeedbackServiceTest`.
 
 ---
 
@@ -344,6 +358,24 @@ public LoyaltyTransaction clawbackReservationPoints(Long reservationId) {
 }
 ```
 
+### 5.7 `ShiftRepository.java` (Database-Level Shift Self-Exclusion)
+```java
+@Query("SELECT s FROM Shift s WHERE s.startAt < :endTime AND s.endAt > :startTime " +
+       "AND s.employee.id = :employeeId AND (:excludeShiftId IS NULL OR s.id != :excludeShiftId)")
+List<Shift> findOverlappingShiftsForEmployeeIdExcludingShiftId(@Param("startTime") LocalDateTime startTime, 
+                                                              @Param("endTime") LocalDateTime endTime, 
+                                                              @Param("employeeId") Long employeeId,
+                                                              @Param("excludeShiftId") Long excludeShiftId);
+```
+
+### 5.8 `FeedbackService.java` (Cancelled Reservation Review Guard)
+```java
+// Validate reservation is not cancelled (AUD-FDBK-001)
+if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+    throw new BusinessRuleException("Cannot provide feedback for a cancelled reservation.");
+}
+```
+
 ---
 
 ## 6. Complete Test Harness & Verification Suite
@@ -355,6 +387,8 @@ The domain fixes are validated through unit, repository, and integration test su
 - **`LoyaltyServiceTest`**: Verifies 1:1 point preservation on refunds, earned points clawback upon cancellation, non-negative balance enforcement (`Math.max(0, ...)`), and cancellation idempotency.
 - **`ReservationServiceTest`**: Verifies simultaneous point refund and clawback invocation upon guest reservation cancellation.
 - **`LoyaltyTransactionTest` & `LoyaltyAccountTest`**: Verifies 4 transaction types (`EARN`, `REDEEM`, `REFUND`, `CLAWBACK`), descriptions, and `@Version` optimistic concurrency properties.
+- **`EmployeeServiceTest` & `ShiftRepositoryTest`**: Verifies `INV-EMP-001` task rejection during approved leave, shift update exclusion queries, and date-bounded training availability.
+- **`FeedbackServiceTest`**: Verifies rejection of reviews submitted on cancelled reservations (`AUD-FDBK-001`).
 
 ---
 
@@ -366,39 +400,38 @@ Full Maven test suite execution across all modules (`./mvnw test`):
 [INFO] -------------------------------------------------------
 [INFO]  T E S T S
 [INFO] -------------------------------------------------------
+[INFO] Running com.MyBooking.employee.service.EmployeeServiceTest
+[INFO] Tests run: 36, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.306 s -- in com.MyBooking.employee.service.EmployeeServiceTest
+[INFO] Running com.MyBooking.feedback.service.FeedbackServiceTest
+[INFO] Tests run: 14, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.855 s -- in com.MyBooking.feedback.service.FeedbackServiceTest
+[INFO] Running com.MyBooking.employee.repository.ShiftRepositoryTest
+[INFO] Tests run: 29, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.741 s -- in com.MyBooking.employee.repository.ShiftRepositoryTest
 [INFO] Running com.MyBooking.loyalty.service.LoyaltyServiceTest
 [INFO] Tests run: 35, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.605 s -- in com.MyBooking.loyalty.service.LoyaltyServiceTest
-[INFO] Running com.MyBooking.loyalty.domain.LoyaltyTransactionTest
-[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.057 s -- in com.MyBooking.loyalty.domain.LoyaltyTransactionTest
-[INFO] Running com.MyBooking.loyalty.domain.LoyaltyAccountTest
-[INFO] Tests run: 8, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.029 s -- in com.MyBooking.loyalty.domain.LoyaltyAccountTest
-[INFO] Running com.MyBooking.reservation.service.ReservationServiceTest
-[INFO] Tests run: 34, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.010 s -- in com.MyBooking.reservation.service.ReservationServiceTest
-[INFO] Running com.MyBooking.event.repository.EventBookingRepositoryTest
-[INFO] Tests run: 29, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 1.571 s -- in com.MyBooking.event.repository.EventBookingRepositoryTest
 [INFO] ...
 [INFO] Results:
 [INFO] 
-[INFO] Tests run: 1156, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 1160, Failures: 0, Errors: 0, Skipped: 0
 [INFO] 
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
 ```
 
-- **Total Test Count**: **1,156 tests**
-- **Pass Rate**: **100% (1,156 passed, 0 failed, 0 errors, 0 skipped)**
-- **Regression Check**: Zero regressions across security, inventory, booking, and loyalty modules.
+- **Total Test Count**: **1,160 tests**
+- **Pass Rate**: **100% (1,160 passed, 0 failed, 0 errors, 0 skipped)**
+- **Regression Check**: Zero regressions across security, inventory, booking, employee scheduling, feedback, and loyalty modules.
 
 ---
 
 ## 8. Evolution Path to Milestone IdP & Phase 4
 
-Upon completion of `P3-T04`, all four core Phase 3 domain refactoring tickets are certified and implemented:
+Upon completion of `P3-T05`, the complete Phase 3 domain refactoring roadmap is certified:
 - `P3-T01`: Reservation Overlap JPQL & Self-Conflict Exemption (`INV-RES-001`, `INV-RES-002`)
 - `P3-T02`: Physical Room Status Decoupling (`INV-ROOM-001`)
 - `P3-T03`: Event Participant Capacity Aggregation & Overbooking Prevention (`INV-EVT-001`, `INV-EVT-002`)
 - `P3-T04`: Loyalty Points Post-Stay Accrual, Cancellation Clawback & Concurrency Hardening (`INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`)
+- `P3-T05`: Employee Leave Integrity, Shift Overlap & Feedback Status Guard (`INV-EMP-001`, `INV-EMP-002`, `AUD-EMP-001`, `AUD-EMP-002`, `AUD-FDBK-001`)
 
 The platform is now primed to advance to **Milestone IdP**:
 1. **Keycloak Identity Provider Adoption**: Centralized OAuth2/OIDC realm configuration (`mybooking-platform`), Docker Compose topology, user migration preserving database IDs.
@@ -410,7 +443,7 @@ The platform is now primed to advance to **Milestone IdP**:
 ## 9. Formal Sign-off & Architectural Acceptance
 
 - **Phase Technical Status**: **COMPLETE & FULLY VERIFIED**
-- **Regression Baseline**: **1,156 / 1,156 Tests Passing (100%)**
+- **Regression Baseline**: **1,160 / 1,160 Tests Passing (100%)**
 - **Sign-off Date**: November 2026
 - **Architecture Governance Alignment**: Reconciled 15-Phase Roadmap & Domain Invariants Matrix Certified.
 

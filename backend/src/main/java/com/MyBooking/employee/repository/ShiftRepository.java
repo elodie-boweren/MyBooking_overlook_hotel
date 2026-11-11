@@ -47,6 +47,13 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     List<Shift> findOverlappingShiftsForEmployeeId(@Param("startTime") LocalDateTime startTime, 
                                                   @Param("endTime") LocalDateTime endTime, 
                                                   @Param("employeeId") Long employeeId);
+
+    @Query("SELECT s FROM Shift s WHERE s.startAt < :endTime AND s.endAt > :startTime " +
+           "AND s.employee.id = :employeeId AND (:excludeShiftId IS NULL OR s.id != :excludeShiftId)")
+    List<Shift> findOverlappingShiftsForEmployeeIdExcludingShiftId(@Param("startTime") LocalDateTime startTime, 
+                                                                  @Param("endTime") LocalDateTime endTime, 
+                                                                  @Param("employeeId") Long employeeId,
+                                                                  @Param("excludeShiftId") Long excludeShiftId);
     
     // ==================== EMPLOYEE AND TIME COMBINED QUERIES ====================
     

@@ -170,6 +170,16 @@ public class EmployeeService {
             throw new BusinessRuleException("Cannot assign task to employee currently in training");
         }
 
+        // Check if employee has approved leave today (INV-EMP-001)
+        LocalDate today = LocalDate.now();
+        User employeeUser = employee.getUser();
+        List<LeaveRequest> leaveRequests = leaveRequestRepository.findByEmployeeAndStatus(employeeUser, LeaveRequestStatus.APPROVED);
+        for (LeaveRequest leave : leaveRequests) {
+            if (!today.isBefore(leave.getFromDate()) && !today.isAfter(leave.getToDate())) {
+                throw new BusinessRuleException("Cannot assign task to employee currently on approved leave");
+            }
+        }
+
         EmployeeTask task = new EmployeeTask(employee.getUser(), title, description, TaskStatus.TODO);
         return employeeTaskRepository.save(task);
     }
@@ -588,10 +598,10 @@ public class EmployeeService {
     }
 
     /**
-     * Check if employee is available for task assignment
+     * Check if employee is available for task assignment on a specific date
      */
     @Transactional(readOnly = true)
-    public boolean isEmployeeAvailableForTask(Long employeeId) {
+    public boolean isEmployeeAvailableForTask(Long employeeId, LocalDate date) {
         Employee employee = getEmployeeByUserId(employeeId);
         
         // Check if employee is active
@@ -600,7 +610,29 @@ public class EmployeeService {
         }
 
         // Check if employee is in training
-        return !hasInProgressTraining(employeeId);
+        if (hasInProgressTraining(employeeId)) {
+            return false;
+        }
+
+        // Check if employee has approved leave on this date (INV-EMP-001)
+        User employeeUser = employee.getUser();
+        List<LeaveRequest> leaveRequests = leaveRequestRepository.findByEmployeeAndStatus(employeeUser, LeaveRequestStatus.APPROVED);
+        
+        for (LeaveRequest leave : leaveRequests) {
+            if (!date.isBefore(leave.getFromDate()) && !date.isAfter(leave.getToDate())) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Check if employee is available for task assignment
+     */
+    @Transactional(readOnly = true)
+    public boolean isEmployeeAvailableForTask(Long employeeId) {
+        return isEmployeeAvailableForTask(employeeId, LocalDate.now());
     }
 
     // ==================== SHIFT MANAGEMENT ====================
@@ -652,9 +684,9 @@ public class EmployeeService {
             throw new BusinessRuleException("Shift start time cannot be after end time");
         }
 
-        // Check for overlapping shifts (excluding current shift)
-        List<Shift> overlappingShifts = shiftRepository.findOverlappingShiftsForEmployeeId(startAt, endAt, shift.getEmployee().getId());
-        overlappingShifts.removeIf(s -> s.getId().equals(shiftId));
+        // Check for overlapping shifts (excluding current shift) using database query
+        List<Shift> overlappingShifts = shiftRepository.findOverlappingShiftsForEmployeeIdExcludingShiftId(
+            startAt, endAt, shift.getEmployee().getId(), shiftId);
         if (!overlappingShifts.isEmpty()) {
             throw new BusinessRuleException("Employee already has overlapping shift");
         }

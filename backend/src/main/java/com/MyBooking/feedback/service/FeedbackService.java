@@ -8,6 +8,7 @@ import com.MyBooking.auth.domain.Role;
 import com.MyBooking.auth.domain.User;
 import com.MyBooking.auth.repository.UserRepository;
 import com.MyBooking.reservation.domain.Reservation;
+import com.MyBooking.reservation.domain.ReservationStatus;
 import com.MyBooking.reservation.repository.ReservationRepository;
 import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
@@ -306,6 +307,11 @@ public class FeedbackService {
         // Validate reservation is completed (check-out date has passed)
         if (reservation.getCheckOut().isAfter(LocalDateTime.now().toLocalDate())) {
             throw new BusinessRuleException("Feedback can only be provided after check-out date.");
+        }
+
+        // Validate reservation is not cancelled (AUD-FDBK-001)
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new BusinessRuleException("Cannot provide feedback for a cancelled reservation.");
         }
     }
 

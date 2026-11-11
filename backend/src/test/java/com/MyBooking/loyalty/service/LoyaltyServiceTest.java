@@ -565,9 +565,12 @@ class LoyaltyServiceTest {
     void refundReservationPoints_WithValidData_ShouldRefundPoints() {
         // Given
         Integer pointsUsed = 500;
+        testAccount.setBalance(1000);
+        LoyaltyTransaction refundTx = new LoyaltyTransaction(testAccount, LoyaltyTxType.REFUND, 500, testReservation);
+
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
         when(loyaltyAccountRepository.findByUserId(1L)).thenReturn(Optional.of(testAccount));
-        when(loyaltyTransactionRepository.save(any(LoyaltyTransaction.class))).thenReturn(testTransaction);
+        when(loyaltyTransactionRepository.save(any(LoyaltyTransaction.class))).thenReturn(refundTx);
         when(loyaltyAccountRepository.save(any(LoyaltyAccount.class))).thenReturn(testAccount);
 
         // When
@@ -575,8 +578,11 @@ class LoyaltyServiceTest {
 
         // Then
         assertThat(result).isNotNull();
+        assertThat(result.getType()).isEqualTo(LoyaltyTxType.REFUND);
+        assertThat(result.getPoints()).isEqualTo(500);
+        assertThat(testAccount.getBalance()).isEqualTo(1500);
 
-        verify(reservationRepository, times(2)).findById(1L); // Called twice: once in refundReservationPoints, once in earnPoints
+        verify(reservationRepository, times(1)).findById(1L);
         verify(loyaltyAccountRepository).findByUserId(1L);
         verify(loyaltyTransactionRepository).save(any(LoyaltyTransaction.class));
         verify(loyaltyAccountRepository).save(any(LoyaltyAccount.class));
@@ -595,6 +601,90 @@ class LoyaltyServiceTest {
 
         verify(reservationRepository, never()).findById(any());
         verify(loyaltyAccountRepository, never()).findByUserId(any());
+    }
+
+    @Test
+    void clawbackReservationPoints_WithEarnedPoints_ShouldDeductPointsWithClawbackType() {
+        // Given
+        testAccount.setBalance(1000);
+        LoyaltyTransaction earnTx = new LoyaltyTransaction(testAccount, LoyaltyTxType.EARN, 200, testReservation);
+        LoyaltyTransaction clawbackTx = new LoyaltyTransaction(testAccount, LoyaltyTxType.CLAWBACK, 200, testReservation);
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.CLAWBACK, 1L)).thenReturn(false);
+        when(loyaltyTransactionRepository.findByTypeAndReservationId(LoyaltyTxType.EARN, 1L))
+                .thenReturn(Collections.singletonList(earnTx));
+        when(loyaltyAccountRepository.findByUserId(1L)).thenReturn(Optional.of(testAccount));
+        when(loyaltyTransactionRepository.save(any(LoyaltyTransaction.class))).thenReturn(clawbackTx);
+        when(loyaltyAccountRepository.save(any(LoyaltyAccount.class))).thenReturn(testAccount);
+
+        // When
+        LoyaltyTransaction result = loyaltyService.clawbackReservationPoints(1L);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(result.getType()).isEqualTo(LoyaltyTxType.CLAWBACK);
+        assertThat(result.getPoints()).isEqualTo(200);
+        assertThat(testAccount.getBalance()).isEqualTo(800);
+
+        verify(loyaltyTransactionRepository).save(any(LoyaltyTransaction.class));
+        verify(loyaltyAccountRepository).save(testAccount);
+    }
+
+    @Test
+    void clawbackReservationPoints_WhenBalanceLowerThanEarned_ShouldClampToZero() {
+        // Given - user spent points elsewhere and only has 50 points left, but earned 200
+        testAccount.setBalance(50);
+        LoyaltyTransaction earnTx = new LoyaltyTransaction(testAccount, LoyaltyTxType.EARN, 200, testReservation);
+        LoyaltyTransaction clawbackTx = new LoyaltyTransaction(testAccount, LoyaltyTxType.CLAWBACK, 200, testReservation);
+
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.CLAWBACK, 1L)).thenReturn(false);
+        when(loyaltyTransactionRepository.findByTypeAndReservationId(LoyaltyTxType.EARN, 1L))
+                .thenReturn(Collections.singletonList(earnTx));
+        when(loyaltyAccountRepository.findByUserId(1L)).thenReturn(Optional.of(testAccount));
+        when(loyaltyTransactionRepository.save(any(LoyaltyTransaction.class))).thenReturn(clawbackTx);
+        when(loyaltyAccountRepository.save(any(LoyaltyAccount.class))).thenReturn(testAccount);
+
+        // When
+        LoyaltyTransaction result = loyaltyService.clawbackReservationPoints(1L);
+
+        // Then
+        assertThat(result).isNotNull();
+        assertThat(testAccount.getBalance()).isEqualTo(0);
+        verify(loyaltyAccountRepository).save(testAccount);
+    }
+
+    @Test
+    void clawbackReservationPoints_WithoutEarnedPoints_ShouldReturnNull() {
+        // Given
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.CLAWBACK, 1L)).thenReturn(false);
+        when(loyaltyTransactionRepository.findByTypeAndReservationId(LoyaltyTxType.EARN, 1L))
+                .thenReturn(Collections.emptyList());
+
+        // When
+        LoyaltyTransaction result = loyaltyService.clawbackReservationPoints(1L);
+
+        // Then
+        assertThat(result).isNull();
+        verify(loyaltyTransactionRepository, never()).save(any());
+        verify(loyaltyAccountRepository, never()).save(any());
+    }
+
+    @Test
+    void clawbackReservationPoints_AlreadyClawedBack_ShouldReturnNull() {
+        // Given
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.CLAWBACK, 1L)).thenReturn(true);
+
+        // When
+        LoyaltyTransaction result = loyaltyService.clawbackReservationPoints(1L);
+
+        // Then
+        assertThat(result).isNull();
+        verify(loyaltyTransactionRepository, never()).findByTypeAndReservationId(any(), any());
+        verify(loyaltyTransactionRepository, never()).save(any());
     }
 
     // ========== STATISTICS TESTS ==========

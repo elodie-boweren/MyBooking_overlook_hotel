@@ -133,11 +133,15 @@ class LoyaltyTransactionTest {
     @Test
     void testTransactionTypeEnumValues() {
         // Test all transaction type enum values
-        assertEquals(2, LoyaltyTxType.values().length);
+        assertEquals(4, LoyaltyTxType.values().length);
         assertTrue(Set.of(LoyaltyTxType.values()).contains(LoyaltyTxType.EARN));
         assertTrue(Set.of(LoyaltyTxType.values()).contains(LoyaltyTxType.REDEEM));
+        assertTrue(Set.of(LoyaltyTxType.values()).contains(LoyaltyTxType.REFUND));
+        assertTrue(Set.of(LoyaltyTxType.values()).contains(LoyaltyTxType.CLAWBACK));
         assertEquals("Earn points", LoyaltyTxType.EARN.getDescription());
         assertEquals("Redeem points", LoyaltyTxType.REDEEM.getDescription());
+        assertEquals("Refund redeemed points", LoyaltyTxType.REFUND.getDescription());
+        assertEquals("Clawback earned points", LoyaltyTxType.CLAWBACK.getDescription());
     }
 
     @Test

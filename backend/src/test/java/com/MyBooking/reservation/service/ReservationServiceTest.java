@@ -11,6 +11,7 @@ import com.MyBooking.room.service.RoomService;
 import com.MyBooking.auth.domain.User;
 import com.MyBooking.auth.domain.Role;
 import com.MyBooking.auth.repository.UserRepository;
+import com.MyBooking.loyalty.service.LoyaltyService;
 import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +50,9 @@ class ReservationServiceTest {
     
     @Mock
     private RoomService roomService;
+
+    @Mock
+    private LoyaltyService loyaltyService;
     
     @InjectMocks
     private ReservationService reservationService;
@@ -357,6 +361,24 @@ class ReservationServiceTest {
         verify(reservationRepository).findById(1L);
         verify(reservationRepository).save(testReservation);
         verify(roomService, never()).updateRoomStatusAutomatically(anyLong(), any(), anyString());
+        verify(loyaltyService).clawbackReservationPoints(1L);
+    }
+
+    @Test
+    void cancelReservation_WithRedeemedPoints_ShouldRefundAndClawbackPoints() {
+        // Given
+        testReservation.setPointsUsed(300);
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
+
+        // When
+        reservationService.cancelReservation(1L, "Guest requested cancellation with refund");
+
+        // Then
+        assertThat(testReservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED);
+        verify(loyaltyService).refundReservationPoints(1L, 300);
+        verify(loyaltyService).clawbackReservationPoints(1L);
+        verify(reservationRepository).save(testReservation);
     }
 
     @Test

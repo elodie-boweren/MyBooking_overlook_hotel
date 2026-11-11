@@ -397,6 +397,9 @@ public class ReservationService {
         if (reservation.getPointsUsed() != null && reservation.getPointsUsed() > 0) {
             loyaltyService.refundReservationPoints(reservationId, reservation.getPointsUsed());
         }
+
+        // Claw back any points earned when reservation was created (INV-LOY-002)
+        loyaltyService.clawbackReservationPoints(reservationId);
         
         // Update reservation status
         reservation.setStatus(ReservationStatus.CANCELLED);

@@ -2,9 +2,11 @@ package com.MyBooking.loyalty.repository;
 
 import com.MyBooking.loyalty.domain.LoyaltyAccount;
 import com.MyBooking.auth.domain.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,6 +25,11 @@ public interface LoyaltyAccountRepository extends JpaRepository<LoyaltyAccount, 
     
     // Find by user (ID-based)
     Optional<LoyaltyAccount> findByUserId(Long userId);
+
+    // Find by user (ID-based) with pessimistic write lock for high-contention operations
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM LoyaltyAccount a WHERE a.user.id = :userId")
+    Optional<LoyaltyAccount> findByUserIdForUpdate(@Param("userId") Long userId);
 
     // ==================== BALANCE QUERIES ====================
 

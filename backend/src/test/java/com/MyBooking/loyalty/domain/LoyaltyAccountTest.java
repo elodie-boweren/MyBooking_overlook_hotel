@@ -111,4 +111,10 @@ class LoyaltyAccountTest {
         violations = validator.validate(loyaltyAccount);
         assertTrue(violations.isEmpty(), "Large balance should be valid");
     }
+
+    @Test
+    void testVersionGetterSetter() {
+        loyaltyAccount.setVersion(3L);
+        assertEquals(3L, loyaltyAccount.getVersion());
+    }
 }

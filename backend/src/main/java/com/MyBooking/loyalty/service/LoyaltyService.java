@@ -465,7 +465,8 @@ public class LoyaltyService {
     }
 
     /**
-     * Refund points for a cancelled reservation
+     * Refund redeemed points for a cancelled reservation (1:1 points restoration).
+     * Enforces INV-LOY-002 and INV-LOY-003 by creating a LoyaltyTransaction of type REFUND.
      */
     public LoyaltyTransaction refundReservationPoints(Long reservationId, Integer pointsUsed) {
         if (pointsUsed == null || pointsUsed <= 0) {
@@ -479,15 +480,60 @@ public class LoyaltyService {
             throw new BusinessRuleException("Reservation has no associated client");
         }
 
-        // Convert points back to monetary amount for earning
-        BigDecimal refundAmount = calculatePointsDiscountAmount(pointsUsed);
+        LoyaltyAccount account = getOrCreateLoyaltyAccount(reservation.getClient().getId());
 
-        return earnPoints(
-            reservation.getClient().getId(),
-            refundAmount,
-            "Points refunded for cancelled reservation #" + reservationId,
-            reservationId
-        );
+        // Create REFUND transaction directly restoring points 1:1
+        LoyaltyTransaction transaction = new LoyaltyTransaction(account, LoyaltyTxType.REFUND, pointsUsed, reservation);
+        LoyaltyTransaction savedTransaction = loyaltyTransactionRepository.save(transaction);
+
+        // Update account balance
+        account.setBalance(account.getBalance() + pointsUsed);
+        loyaltyAccountRepository.save(account);
+
+        return savedTransaction;
+    }
+
+    /**
+     * Claw back points earned from a reservation when it is cancelled prior to check-in.
+     * Enforces INV-LOY-001 (non-negative balance) and INV-LOY-002 (symmetrical cancellation clawback).
+     */
+    public LoyaltyTransaction clawbackReservationPoints(Long reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+            .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + reservationId));
+
+        if (reservation.getClient() == null) {
+            throw new BusinessRuleException("Reservation has no associated client");
+        }
+
+        // Check if clawback has already been executed (idempotency guard)
+        if (loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.CLAWBACK, reservationId)) {
+            return null;
+        }
+
+        // Find all EARN transactions for this reservation
+        List<LoyaltyTransaction> earnTransactions = loyaltyTransactionRepository
+            .findByTypeAndReservationId(LoyaltyTxType.EARN, reservationId);
+
+        int totalEarnedPoints = earnTransactions.stream()
+            .mapToInt(LoyaltyTransaction::getPoints)
+            .sum();
+
+        if (totalEarnedPoints <= 0) {
+            return null; // No earned points to claw back
+        }
+
+        LoyaltyAccount account = getOrCreateLoyaltyAccount(reservation.getClient().getId());
+
+        // Create CLAWBACK transaction
+        LoyaltyTransaction transaction = new LoyaltyTransaction(account, LoyaltyTxType.CLAWBACK, totalEarnedPoints, reservation);
+        LoyaltyTransaction savedTransaction = loyaltyTransactionRepository.save(transaction);
+
+        // Deduct points from balance, guaranteeing balance >= 0 (INV-LOY-001)
+        int updatedBalance = Math.max(0, account.getBalance() - totalEarnedPoints);
+        account.setBalance(updatedBalance);
+        loyaltyAccountRepository.save(account);
+
+        return savedTransaction;
     }
 
     // ========== INNER CLASSES ==========

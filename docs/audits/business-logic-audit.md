@@ -287,6 +287,38 @@ Summary of Audit Findings:
 - **Severity**: **Low** | **Confidence**: **Confirmed**
 - **Roadmap Phase**: **Phase 03 Amendment**.
 
+### Finding `AUD-ANL-001`: In-Memory Database Scanning & OutOfMemory Vulnerability
+- **Domain**: Analytics & Reporting
+- **Source**: `AnalyticsService.java` (L301, L330).
+- **Existing Behavior**: `calculateRoomRevenue` and `calculateOccupiedRoomNights` invoke `reservationService.getAllReservations()`, dumping the entire table into JVM memory and filtering via Java streams.
+- **Expected Behavior**: Push aggregations down to database SQL/JPQL (`SELECT COALESCE(SUM(r.totalPrice), 0)...`) with indexed date criteria.
+- **Severity**: **Critical** | **Confidence**: **Confirmed**
+- **Roadmap Phase**: **Phase 03** (Monolith query hardening via `P3-T07`) and **Phase 10** (Go + ClickHouse distributed OLAP).
+
+### Finding `AUD-ANL-002`: Hardcoded Mock Event Revenue & Cross-Period Double-Counting
+- **Domain**: Analytics & Finance
+- **Source**: `AnalyticsService.java` (L311–316, L303).
+- **Existing Behavior**: `calculateEventRevenue` returns hardcoded `BigDecimal.valueOf(25000.00)`. Reservations spanning across period boundaries have their full price counted multiple times in monthly revenue trends.
+- **Expected Behavior**: Calculate real event revenue via `EventBookingRepository` confirmed bookings; prorate multi-month stays nightly to prevent double-counting.
+- **Severity**: **High** | **Confidence**: **Confirmed**
+- **Roadmap Phase**: **Phase 03** (`P3-T07`).
+
+### Finding `AUD-ANN-001`: Orphan Backend Module (Missing REST Controller & DTOs)
+- **Domain**: Employee Announcements
+- **Source**: `com.MyBooking.announcement` (`controller/.gitkeep`, `dto/.gitkeep`).
+- **Existing Behavior**: Domain entities, repositories, and `AnnouncementService` exist with tests, but no DTOs and no REST controller are implemented. The feature is completely unreachable from web, mobile, or REST clients.
+- **Expected Behavior**: Expose secured REST endpoints (`AnnouncementController`) with complete request/response DTOs.
+- **Severity**: **High** | **Confidence**: **Confirmed**
+- **Roadmap Phase**: **Phase 03** (`P3-T08`).
+
+### Finding `AUD-ANN-002`: Absence of Department Audience Targeting
+- **Domain**: Employee Operations & Communications
+- **Source**: `Announcement.java`, `Employee.java`.
+- **Existing Behavior**: Announcements have global scope with no department or role filtering. No `Department` domain concept exists in `Employee`.
+- **Expected Behavior**: Introduce `Department` enum to `Employee` and audience scoping (`targetDepartment`, `targetRole`) to `Announcement`.
+- **Severity**: **Medium** | **Confidence**: **Confirmed**
+- **Roadmap Phase**: **Phase 03** (`P3-T08`).
+
 ### Finding `AUD-PAY-001`: Complete Absence of Payment Model in Monolith
 - **Domain**: Finance & Payments
 - **Source**: Monolith codebase (no `Payment` entity exists).
@@ -319,6 +351,9 @@ Summary of Audit Findings:
 | `AUD-EMP-002` | **Confirmed Defect** | Check training dates instead of global `IN_PROGRESS` status. |
 | `AUD-FDBK-001`| **Confirmed Defect** | Disallow feedback on cancelled reservations. |
 | `AUD-ANL-001` | **Confirmed Defect** | Replace in-memory reservation scan with repository aggregation queries. |
+| `AUD-ANL-002` | **Confirmed Defect** | Replace hardcoded mock event revenue and eliminate multi-month double counting. |
+| `AUD-ANN-001` | **Missing Functionality** | Expose secured REST controller and DTOs for orphan announcement service. |
+| `AUD-ANN-002` | **Missing Functionality** | Introduce Department domain model and targeted announcement audience scoping. |
 | `AUD-PAY-001` | **Architectural Limitation** | Implement in Phase 09 (`payment-service`). |
 | `AUD-TEN-001` | **Architectural Limitation** | Implement in Phase 04 / Phase 08 (Multi-property tenant isolation). |
 
@@ -330,19 +365,22 @@ Every identified defect and limitation is traced directly to our authoritative 1
 
 | Finding ID | Description | Existing Phase | Coverage Status | Required Action | Scope Impact | Dependencies | Recommendation |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `AUD-RES-001` | Flawed Overlap JPQL Query | **Phase 03** | **Fully Covered** | Fix query | None | Phase 02 | Implement in Phase 3 |
-| `AUD-RES-002` | Static Room Mutation | **Phase 03** | **Fully Covered** | Decouple status | None | Phase 02 | Implement in Phase 3 |
+| `AUD-RES-001` | Flawed Overlap JPQL Query | **Phase 03** | **Fully Covered** | Fix query | None | Phase 02 | Implement in Phase 3 (`P3-T01`) |
+| `AUD-RES-002` | Static Room Mutation | **Phase 03** | **Fully Covered** | Decouple status | None | Phase 02 | Implement in Phase 3 (`P3-T02`) |
 | `AUD-RES-003` | Concurrency on Booking | **Phase 03** | Partially Covered | Add lock | Clarification | Phase 02 | Add to Phase 3 tests |
 | `AUD-RES-004` | Stay Lifecycle States | **Phase 03 / 04** | Partially Covered | Model states | Clarification | Phase 03 | Expand enum in Phase 3 |
-| `AUD-EVT-001` | Event Capacity Overbooking | **Phase 03** | **Uncovered (Domain Bug)** | Fix query & check | Proposed Amendment | Phase 02 | Add to Phase 3 Domain Fixes |
-| `AUD-EVT-002` | Event Booking Concurrency | **Phase 03** | Uncovered | Add lock | Proposed Amendment | Phase 02 | Add to Phase 3 Domain Fixes |
-| `AUD-LOY-001` | Loyalty Point Earning/Clawback | **Phase 03 / 04** | Uncovered | Reversal logic | Proposed Amendment | Phase 02 | Add to Phase 3 or Phase 4 |
-| `AUD-LOY-002` | Loyalty Lost Update Concurrency| **Phase 03** | Uncovered | Add `@Version` | Proposed Amendment | Phase 02 | Add `@Version` in Phase 3 |
-| `AUD-ROOM-001`| Room Status Conflation | **Phase 03 / 04** | Partially Covered | Decouple in P3 | Clarification | Phase 03 | Fix P3 query; schema in P4 |
-| `AUD-EMP-001` | Task Ignores Approved Leave | **Phase 03** | Uncovered | Add leave check | Proposed Amendment | Phase 02 | Add to Phase 3 Domain Fixes |
-| `AUD-EMP-002` | Global Training Lockout | **Phase 03** | Uncovered | Check dates | Proposed Amendment | Phase 02 | Add to Phase 3 Domain Fixes |
-| `AUD-FDBK-001`| Feedback on Cancelled Booking | **Phase 03** | Uncovered | Add status check | Proposed Amendment | Phase 02 | Add to Phase 3 Domain Fixes |
-| `AUD-ANL-001` | Analytics Memory Scans | **Phase 10** | **Fully Covered** | Go + ClickHouse | None | Phase 09 | Keep in Phase 10 |
+| `AUD-EVT-001` | Event Capacity Overbooking | **Phase 03** | **Uncovered (Domain Bug)** | Fix query & check | Proposed Amendment | Phase 02 | Implemented in `P3-T03` |
+| `AUD-EVT-002` | Event Booking Concurrency | **Phase 03** | Uncovered | Add lock | Proposed Amendment | Phase 02 | Implemented in `P3-T03` |
+| `AUD-LOY-001` | Loyalty Point Earning/Clawback | **Phase 03 / 04** | Uncovered | Reversal logic | Proposed Amendment | Phase 02 | Implemented in `P3-T04` |
+| `AUD-LOY-002` | Loyalty Lost Update Concurrency| **Phase 03** | Uncovered | Add `@Version` | Proposed Amendment | Phase 02 | Implemented in `P3-T04` |
+| `AUD-ROOM-001`| Room Status Conflation | **Phase 03 / 04** | Partially Covered | Decouple in P3 | Clarification | Phase 03 | Implemented in `P3-T02` |
+| `AUD-EMP-001` | Task Ignores Approved Leave | **Phase 03** | Uncovered | Add leave check | Proposed Amendment | Phase 02 | Implemented in `P3-T05` |
+| `AUD-EMP-002` | Global Training Lockout | **Phase 03** | Uncovered | Check dates | Proposed Amendment | Phase 02 | Implemented in `P3-T05` |
+| `AUD-FDBK-001`| Feedback on Cancelled Booking | **Phase 03** | Uncovered | Add status check | Proposed Amendment | Phase 02 | Implemented in `P3-T05` |
+| `AUD-ANL-001` | Analytics Memory Scans | **Phase 03 / 10** | **Fully Covered** | JPQL SUM + ClickHouse | Phase 3 Enhancement | Phase 02 | Implement in Phase 3 (`P3-T07`) |
+| `AUD-ANL-002` | Mock Event Revenue & Double Counting | **Phase 03** | **Uncovered (Domain Bug)** | Real Event Rev & Proration | Phase 3 Enhancement | Phase 02 | Implement in Phase 3 (`P3-T07`) |
+| `AUD-ANN-001` | Orphan Announcement Backend | **Phase 03** | **Uncovered (Missing Layer)** | REST Controller & DTOs | Phase 3 Enhancement | Phase 02 | Implement in Phase 3 (`P3-T08`) |
+| `AUD-ANN-002` | Missing Department Scoping | **Phase 03** | **Uncovered (Missing Domain)**| Department & Target Query | Phase 3 Enhancement | Phase 02 | Implement in Phase 3 (`P3-T08`) |
 | `AUD-PAY-001` | Absence of Payment Service | **Phase 09** | **Fully Covered** | Svc #7 Payment | None | Phase 08 | Keep in Phase 09 |
 | `AUD-TEN-001` | Monolith Single Property | **Phase 04 / 08** | **Fully Covered** | Schema & Tenant | None | Phase 03 | Model in Phase 4 / 8 |
 
@@ -356,18 +394,20 @@ Every identified defect and limitation is traced directly to our authoritative 1
 - **Scope**: `ReservationRepository`, `ReservationService`.
 
 ### The Core Architectural Question
-*Should Phase 03 remain strictly limited to the 3 reservation defects, or should it encompass the other confirmed domain logic bugs (`AUD-EVT-001` Event overbooking, `AUD-LOY-001/002` Loyalty exploit/concurrency, `AUD-EMP-001` Employee leave)?*
+*Should Phase 03 remain strictly limited to the 3 reservation defects, or should it encompass the other confirmed domain logic bugs (`AUD-EVT-001` Event overbooking, `AUD-LOY-001/002` Loyalty exploit/concurrency, `AUD-EMP-001` Employee leave, `AUD-ANL-001/002` Analytics memory bugs, `AUD-ANN-001/002` Orphan announcements)?*
 
 ### Recommendation: Cohesive Domain Integrity in Phase 03
-Because Phase 04 performs **PostgreSQL Schema Isolation (Flyway `V9__*`)** and establishes Bounded Contexts, introducing domain schema isolation on top of defective business logic (overbooking events, infinite loyalty points) is an anti-pattern. 
+Because Phase 04 performs **PostgreSQL Schema Isolation (Flyway `V9__*`)** and establishes Bounded Contexts, introducing domain schema isolation on top of defective business logic (overbooking events, infinite loyalty points, in-memory heap scanning crashes, orphan announcement modules) is an anti-pattern. 
 
-We recommend executing Phase 03 as **Domain Refactoring & Core Business Logic Fixes**, structured into 4 disciplined tickets:
-- **`P3-T01`**: Reservation JPQL Overlap Query Repair & Self-Conflict Elimination (`AUD-RES-001`, `AUD-RES-003`).
-- **`P3-T02`**: Decouple Room Operational Status from Reservation Lifecycle (`AUD-RES-002`, `AUD-ROOM-001`).
-- **`P3-T03`**: Event Capacity Aggregation & Overbooking Prevention (`AUD-EVT-001`, `AUD-EVT-002`).
-- **`P3-T04`**: Loyalty Lifecycle Correction (Cancellation Clawback & Optimistic Lock) (`AUD-LOY-001`, `AUD-LOY-002`).
-- **`P3-T05`**: Employee Leave Scheduling & Feedback Integrity (`AUD-EMP-001`, `AUD-EMP-002`, `AUD-FDBK-001`).
-- **`P3-T06`**: Comprehensive Domain Test Suite & Phase 3 Sign-off Report.
+We recommend executing Phase 03 as **Domain Refactoring & Core Business Logic Fixes**, structured into 8 cohesive tickets with stress testing as the concluding capstone:
+- **`P3-T01`**: Reservation JPQL Overlap Query Repair & Self-Conflict Elimination (`AUD-RES-001`, `AUD-RES-003`) — *COMPLETED*.
+- **`P3-T02`**: Decouple Room Operational Status from Reservation Lifecycle (`AUD-RES-002`, `AUD-ROOM-001`) — *COMPLETED*.
+- **`P3-T03`**: Event Capacity Aggregation & Overbooking Prevention (`AUD-EVT-001`, `AUD-EVT-002`) — *COMPLETED*.
+- **`P3-T04`**: Loyalty Lifecycle Correction (Cancellation Clawback & Optimistic Lock) (`AUD-LOY-001`, `AUD-LOY-002`) — *COMPLETED*.
+- **`P3-T05`**: Employee Leave Scheduling & Feedback Integrity (`AUD-EMP-001`, `AUD-EMP-002`, `AUD-FDBK-001`) — *COMPLETED*.
+- **`P3-T07`**: Analytics Service Query Hardening, Heap Scan Elimination & Real Financial Metrics (`AUD-ANL-001`, `AUD-ANL-002`).
+- **`P3-T08`**: Department Domain Model & Announcement REST API with DTOs and Audience Scoping (`AUD-ANN-001`, `AUD-ANN-002`).
+- **`P3-T06`**: Concurrency Stress Test Suite, Regression Harness & Phase 3 Sign-off Report (Capstone).
 
-*This preserves the exact sequence of the 15-phase roadmap, perfectly positions the platform for **Milestone IdP** (Keycloak + Next.js BFF + UUIDv7), and enters **Phase 04** with 100% mathematically and logically sound domain models.*
+*This preserves the exact sequence of the 15-phase roadmap, ensures zero orphan code or latent OOM bugs remain in the monolith, perfectly positions the platform for **Milestone IdP** (Keycloak + Next.js BFF + UUIDv7), and enters **Phase 04** with 100% mathematically and logically sound domain models.*
 

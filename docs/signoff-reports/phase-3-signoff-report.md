@@ -4,9 +4,9 @@
 - **Phase**: Phase 03 — Domain Refactoring & Reservation Core Fixes
 - **Feature Branch**: `feature/phase-3-domain-refactoring`
 - **Execution Date**: November 2026
-- **Status**: **ACCEPTED & READY FOR PHASE 3 SIGN-OFF**
+- **Status**: **IN PROGRESS (P3-T01 through P3-T05 Verified; P3-T07 & P3-T08 in execution prior to P3-T06 Concurrency Stress Test)**
 - **Test Suite Status**: **1,160 / 1,160 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
-- **Authoritative Invariants**: `INV-RES-001`, `INV-RES-002`, `INV-RES-003`, `INV-ROOM-001`, `INV-EVT-001`, `INV-EVT-002`, `INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`, `INV-EMP-001`, `INV-EMP-002` (documented in `docs/architecture/domain-invariants.md`)
+- **Authoritative Invariants**: `INV-RES-001`, `INV-RES-002`, `INV-RES-003`, `INV-ROOM-001`, `INV-EVT-001`, `INV-EVT-002`, `INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`, `INV-EMP-001`, `INV-EMP-002`, `INV-ANL-001`, `INV-ANL-002`, `INV-ANN-001` (documented in `docs/architecture/domain-invariants.md`)
 
 ---
 
@@ -23,6 +23,9 @@
    - [P3-T03: Event Participant Capacity Aggregation & Overbooking Prevention](#p3-t03-event-participant-capacity-aggregation--overbooking-prevention)
    - [P3-T04: Loyalty Points Post-Stay Accrual, Cancellation Clawback & Concurrency Hardening](#p3-t04-loyalty-points-post-stay-accrual-cancellation-clawback--concurrency-hardening)
    - [P3-T05: Employee Leave Integrity, Shift Overlap & Feedback Status Guard](#p3-t05-employee-leave-integrity-shift-overlap--feedback-status-guard)
+   - [P3-T07: Analytics Query Hardening, Heap Scan Elimination & USALI Real Financial Metrics](#p3-t07-analytics-query-hardening-heap-scan-elimination--usali-real-financial-metrics)
+   - [P3-T08: Department Domain Model & Announcement REST API with Audience Scoping](#p3-t08-department-domain-model--announcement-rest-api-with-audience-scoping)
+   - [P3-T06: Concurrency Stress Test Suite & Business Invariant Regression Harness](#p3-t06-concurrency-stress-test-suite--business-invariant-regression-harness)
 5. [Source Code Implementations of Key Components](#5-source-code-implementations-of-key-components)
 6. [Complete Test Harness & Verification Suite](#6-complete-test-harness--verification-suite)
 7. [Test Execution Results & Performance Metrics](#7-test-execution-results--performance-metrics)
@@ -186,6 +189,9 @@ While `@Version` serves as the optimal primary concurrency mechanism for normal 
 | `INV-LOY-003` | Loyalty | **Immutable Ledger Types**: Append-only ledger supporting `EARN`, `REDEEM`, `REFUND`, and `CLAWBACK`. | `P3-T04` | `LoyaltyTxType`, `LoyaltyTransaction` | `LoyaltyTransactionTest` |
 | `INV-EMP-001` | Staff Operations | **Leave Exclusivity Rule**: Employees cannot be scheduled for shifts or assigned tasks during approved leave dates. | `P3-T05` | `EmployeeService.createTask`, `isEmployeeAvailableForTask` | `EmployeeServiceTest` |
 | `INV-EMP-002` | Staff Operations | **Shift Non-Overlap Rule**: Shifts cannot overlap existing active shifts for an employee; update excludes target shift ID. | `P3-T05` | `ShiftRepository.findOverlappingShiftsForEmployeeIdExcludingShiftId` | `EmployeeServiceTest`, `ShiftRepositoryTest` |
+| `INV-ANL-001` | Analytics | **Push-Down Database Aggregation Rule**: Financial/occupancy statistics must execute as SQL/JPQL aggregations, never streaming unpaginated rows into JVM memory. | `P3-T07` | `ReservationRepository`, `AnalyticsService` | `AnalyticsServiceTest` |
+| `INV-ANL-002` | Analytics | **USALI Proration & Real Activity Rule**: Nightly revenue proration for multi-month stays; real event revenue aggregation; formal ADR/RevPAR calculations. | `P3-T07` | `AnalyticsService`, `EventBookingRepository` | `AnalyticsServiceTest` |
+| `INV-ANN-001` | Internal Comms | **Department Audience Scoping Rule**: Announcements are strictly visible to targeted departments (`ALL` or matching employee department) and roles. | `P3-T08` | `AnnouncementRepository`, `AnnouncementService`, `AnnouncementController` | `AnnouncementServiceTest`, `AnnouncementControllerTest` |
 
 ---
 
@@ -240,6 +246,35 @@ While `@Version` serves as the optimal primary concurrency mechanism for normal 
   - Added `findOverlappingShiftsForEmployeeIdExcludingShiftId` with `:excludeShiftId IS NULL OR s.id != :excludeShiftId` in `ShiftRepository`, replacing the `removeIf` in `EmployeeService.updateShift`.
   - Added `reservation.getStatus() == ReservationStatus.CANCELLED` check in `FeedbackService.validateFeedbackCreation`, blocking invalid reviews.
   - Added unit test cases across `EmployeeServiceTest` and `FeedbackServiceTest`.
+
+### P3-T07: Analytics Query Hardening, Heap Scan Elimination & USALI Real Financial Metrics
+- **Problem**:
+  1. *In-Memory Table Scanning (`AUD-ANL-001`, `INV-ANL-001`)*: `AnalyticsService.calculateRoomRevenue` and `calculateOccupiedRoomNights` called `reservationService.getAllReservations()`, dumping the entire table into JVM memory and running Java stream filters, posing a critical `OutOfMemoryError` risk under production load.
+  2. *Hardcoded Event Revenue (`AUD-ANL-002`, `INV-ANL-002`)*: `calculateEventRevenue` returned a hardcoded dummy placeholder `return BigDecimal.valueOf(25000.00)`.
+  3. *Cross-Month Revenue Double Counting (`INV-ANL-002`)*: Overlapping reservations had their full `totalPrice` counted in every month they touched.
+  4. *Deprecated BigDecimal Division*: Used deprecated integer constant `BigDecimal.ROUND_HALF_UP` instead of `RoundingMode.HALF_UP`.
+- **Solution Plan**:
+  - Implement push-down JPQL aggregation queries in `ReservationRepository` (`SELECT COALESCE(SUM(r.totalPrice), 0)...`) and `EventBookingRepository`.
+  - Prorate multi-month reservations nightly across requested date bounds to eliminate double counting.
+  - Replace dummy event revenue with real confirmed bookings aggregation.
+  - Formally implement USALI metrics: Average Daily Rate (ADR), Revenue Per Available Room (RevPAR), and Occupancy Rate %.
+
+### P3-T08: Department Domain Model & Announcement REST API with Audience Scoping
+- **Problem**:
+  1. *Orphan Backend Module (`AUD-ANN-001`)*: `com.MyBooking.announcement` contained domain entities and service logic, but `controller/` and `dto/` were empty `.gitkeep` files. The module was unreachable by any API client.
+  2. *Missing Department Concept (`AUD-ANN-002`)*: `Employee` had only a free-text `jobTitle` without an operational department enum. Announcements had no audience targeting.
+- **Solution Plan**:
+  - Introduce `Department` enum (`ALL`, `FRONT_DESK`, `HOUSEKEEPING`, `MAINTENANCE`, `FOOD_AND_BEVERAGE`, `MANAGEMENT`, `SECURITY`) and assign it to `Employee`.
+  - Add `targetDepartment` and `targetRole` to `Announcement` domain entity.
+  - Create full suite of DTOs (`AnnouncementResponseDto`, `AnnouncementCreateRequestDto`, `AnnouncementReplyRequestDto`).
+  - Implement secured `AnnouncementController` (`/api/announcements`) with role/department filtering and acknowledgment capabilities.
+
+### P3-T06: Concurrency Stress Test Suite & Business Invariant Regression Harness
+- **Problem**:
+  - Need a dedicated, multi-threaded stress harness validating that all Phase 3 concurrency fixes (pessimistic row locking on events, optimistic locking on loyalty points, room interval collisions, shift non-overlap, and analytics push-down queries) hold under high parallel load with zero race conditions or deadlocks.
+- **Solution Plan**:
+  - Multi-threaded stress tests simulating parallel bookings, simultaneous loyalty redemptions, concurrent shift scheduling, and rapid reporting queries.
+  - Automated verification of zero lost updates and zero capacity overruns.
 
 ---
 
@@ -426,14 +461,17 @@ Full Maven test suite execution across all modules (`./mvnw test`):
 
 ## 8. Evolution Path to Milestone IdP & Phase 4
 
-Upon completion of `P3-T05`, the complete Phase 3 domain refactoring roadmap is certified:
-- `P3-T01`: Reservation Overlap JPQL & Self-Conflict Exemption (`INV-RES-001`, `INV-RES-002`)
-- `P3-T02`: Physical Room Status Decoupling (`INV-ROOM-001`)
-- `P3-T03`: Event Participant Capacity Aggregation & Overbooking Prevention (`INV-EVT-001`, `INV-EVT-002`)
-- `P3-T04`: Loyalty Points Post-Stay Accrual, Cancellation Clawback & Concurrency Hardening (`INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`)
-- `P3-T05`: Employee Leave Integrity, Shift Overlap & Feedback Status Guard (`INV-EMP-001`, `INV-EMP-002`, `AUD-EMP-001`, `AUD-EMP-002`, `AUD-FDBK-001`)
+Upon completion of tickets `P3-T01` through `P3-T08`, the full Phase 3 domain refactoring roadmap is certified:
+- `P3-T01`: Reservation Overlap JPQL & Self-Conflict Exemption (`INV-RES-001`, `INV-RES-002`) — *COMPLETED*
+- `P3-T02`: Physical Room Status Decoupling (`INV-ROOM-001`) — *COMPLETED*
+- `P3-T03`: Event Participant Capacity Aggregation & Overbooking Prevention (`INV-EVT-001`, `INV-EVT-002`) — *COMPLETED*
+- `P3-T04`: Loyalty Points Post-Stay Accrual, Cancellation Clawback & Concurrency Hardening (`INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`) — *COMPLETED*
+- `P3-T05`: Employee Leave Integrity, Shift Overlap & Feedback Status Guard (`INV-EMP-001`, `INV-EMP-002`, `AUD-EMP-001`, `AUD-EMP-002`, `AUD-FDBK-001`) — *COMPLETED*
+- `P3-T07`: Analytics Query Hardening, Heap Scan Elimination & USALI Real Financial Metrics (`INV-ANL-001`, `INV-ANL-002`, `AUD-ANL-001`, `AUD-ANL-002`)
+- `P3-T08`: Department Domain Model & Announcement REST API with Audience Scoping (`INV-ANN-001`, `AUD-ANN-001`, `AUD-ANN-002`)
+- `P3-T06`: Concurrency Stress Test Suite & Business Invariant Regression Harness (Final Capstone)
 
-The platform is now primed to advance to **Milestone IdP**:
+The platform will then advance to **Milestone IdP**:
 1. **Keycloak Identity Provider Adoption**: Centralized OAuth2/OIDC realm configuration (`mybooking-platform`), Docker Compose topology, user migration preserving database IDs.
 2. **Next.js Backend-For-Frontend (BFF)**: Session cookie encryption, complete elimination of browser `localStorage` JWT storage.
 3. **Dual-Key Public UUIDv7 Anti-Enumeration Architecture (`ADR-0021`)**: Non-sequential public identifiers across core aggregates.

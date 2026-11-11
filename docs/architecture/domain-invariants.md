@@ -40,6 +40,9 @@ Invariant Index:
 │ INV-LOY-003   │ Immutable Loyalty Transaction Ledger                   │ Loyalty & Rewards    │ Phase 03 / 04 │
 │ INV-EMP-001   │ Employee Leave Exclusivity (No Tasks/Shifts on Leave)  │ Staff Operations     │ Phase 03      │
 │ INV-EMP-002   │ Shift Non-Overlap Invariant                            │ Staff Operations     │ Phase 03      │
+│ INV-ANN-001   │ Announcement Department Audience Scoping Invariant     │ Staff Operations     │ Phase 03      │
+│ INV-ANL-001   │ Push-Down Database Aggregation Invariant               │ Analytics & Reporting│ Phase 03      │
+│ INV-ANL-002   │ USALI Revenue Proration & Real Activity Invariant      │ Analytics & Finance  │ Phase 03      │
 │ INV-PAY-001   │ Payment-Reservation Balance Equivalence                │ Finance & Billing    │ Phase 09      │
 │ INV-IAM-001   │ Cryptographic Principal Integrity (Zero-Trust)         │ Identity & Access    │ Phase 02 (OK) │
 │ INV-TEN-001   │ Strict Multi-Property Data Isolation                   │ Multi-Tenancy        │ Phase 04 / 08 │
@@ -217,8 +220,43 @@ Invariant Index:
 * **Domain Owner**: `Staff Operations` Bounded Context.
 * **Enforcement Layer**: `ShiftRepository.findOverlappingShiftsForEmployeeId` check during shift creation and update.
 * **Concurrency Requirements**: Transactional validation.
-* **Current Status**: **SATISFIED** (Enforced in `EmployeeService.createShift`).
+* **Current Status**: **SATISFIED** (Enforced in `EmployeeService.createShift` and `updateShift` via self-exclusion query in `P3-T05`).
 * **Roadmap Phase**: Baseline / Phase 03.
+
+#### `INV-ANN-001`: Announcement Department Audience Scoping Invariant
+* **Business Rule**: An employee may only view announcements that are either broadcast globally (`targetDepartment = ALL`) or targeted specifically to their assigned operational department (`targetDepartment = employee.department`) and organizational role:
+  $$\forall A \in Announcements: \text{Visible}(Emp, A) \iff (A.targetDepartment \in \{ALL, Emp.department\}) \land (A.targetRole \text{ is null } \lor A.targetRole = Emp.user.role)$$
+* **Domain Owner**: `Staff Operations` & `Internal Communications` Bounded Context.
+* **Enforcement Layer**: Repository query criteria in `AnnouncementRepository.findVisibleAnnouncementsForEmployee` and service-level DTO filtering.
+* **Concurrency Requirements**: Stateless read filtering.
+* **Current Status**: **VIOLATED** (Announcements lack REST controllers, DTOs, and department scoping).
+* **Audit Finding**: `AUD-ANN-001`, `AUD-ANN-002`.
+* **Roadmap Phase**: **Phase 03 (`P3-T08`)**.
+
+---
+
+### Domain: Analytics, Revenue & Management Reporting
+
+#### `INV-ANL-001`: Push-Down Database Aggregation Invariant
+* **Business Rule**: Financial statistics and occupancy reporting queries must never fetch unpaginated entity tables into JVM heap memory. All mathematical summations, counts, and date filters must execute within the database engine via push-down SQL/JPQL aggregations (`SUM`, `COUNT`, `COALESCE`) utilizing indexed columns (`checkIn`, `checkOut`, `status`).
+* **Domain Owner**: `Analytics & Reporting` Bounded Context.
+* **Enforcement Layer**: Repository custom JPQL queries in `ReservationRepository` and `EventBookingRepository` invoked by `AnalyticsService`.
+* **Concurrency Requirements**: Read-committed transactional boundary (`@Transactional(readOnly = true)`).
+* **Current Status**: **VIOLATED** (`calculateRoomRevenue` and `calculateOccupiedRoomNights` perform full table streaming into heap).
+* **Audit Finding**: `AUD-ANL-001`.
+* **Roadmap Phase**: **Phase 03 (`P3-T07`)** (Monolith JPQL hardening) & **Phase 10** (Go + ClickHouse OLAP).
+
+#### `INV-ANL-002`: USALI Multi-Period Revenue Proration & Real Activity Invariant
+* **Business Rule**: Financial analytics must reflect actual transactional revenue (not mock placeholders) and conform to Uniform System of Accounts for the Lodging Industry (USALI) accounting rules:
+  1. Multi-month reservations must be prorated per night to the queried period; a reservation cannot double-count its entire `totalPrice` in multiple monthly reporting windows.
+  2. Event revenue must be aggregated from confirmed `EventBooking` records, with zero mock values ($25,000 placeholder eliminated).
+  3. Industry KPIs must be formally derived: $\text{ADR} = \frac{\text{Room Revenue}}{\text{Rooms Sold}}$, $\text{RevPAR} = \frac{\text{Room Revenue}}{\text{Total Available Rooms}}$, $\text{Occupancy \%} = \frac{\text{Occupied Room Nights}}{\text{Total Available Room Nights}} \times 100$.
+* **Domain Owner**: `Analytics & Finance` Bounded Context.
+* **Enforcement Layer**: `AnalyticsService` calculations and repository aggregation queries.
+* **Concurrency Requirements**: Stateless read-only calculation.
+* **Current Status**: **VIOLATED** (Hardcoded event revenue placeholder, cross-month double counting).
+* **Audit Finding**: `AUD-ANL-002`.
+* **Roadmap Phase**: **Phase 03 (`P3-T07`)**.
 
 ---
 

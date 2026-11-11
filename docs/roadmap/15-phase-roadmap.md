@@ -42,9 +42,9 @@ PHASE 15: Kubernetes DevSecOps Deployment & Production Hardening
 * **Dependencies**: Phase 01.
 
 ### PHASE 03: Domain Refactoring & Reservation Core Fixes
-* **Objective**: Correct the date overlap JPQL calculation, fix self-conflict on reservation updates, and decouple static room status mutations from dynamic bookings.
-* **Scope**: `ReservationRepository`, `ReservationService`, date validation invariants.
-* **Deliverables**: Interval overlap tests passing, back-to-back booking support.
+* **Objective**: Correct date overlap JPQL calculation, fix self-conflict on reservation updates, decouple static room status mutations from dynamic bookings, prevent event overbooking via capacity aggregation and pessimistic locking, enforce post-stay loyalty accrual and cancellation clawbacks, eliminate in-memory analytics heap scans with USALI metrics, wire announcement REST endpoints with department scoping, and stress-test concurrent domain invariants.
+* **Scope**: `ReservationRepository`, `ReservationService`, `EventService`, `LoyaltyService`, `EmployeeService`, `AnalyticsService`, `AnnouncementService`, `AnnouncementController`, `Department` domain attribute, date and capacity validation invariants.
+* **Deliverables**: Interval overlap tests passing, back-to-back booking support, event pessimistic locking, loyalty non-negative balance and clawback, leave exclusivity, database-level analytics aggregations (ADR/RevPAR/Occupancy), secured announcement REST API, 100% passing concurrency stress test suite.
 * **Dependencies**: Phase 02.
 
 ### MILESTONE IdP: Keycloak Identity Provider Adoption, Next.js BFF & Public UUIDv7 Architecture

@@ -674,11 +674,22 @@ public class EventService {
     // ========== EVENT BOOKING DTO METHODS ==========
     
     /**
-     * Create event booking from DTO
+     * Create event booking from DTO with pessimistic row locking and aggregate capacity enforcement [INV-EVT-001, INV-EVT-002].
      */
+    @Transactional
     public com.MyBooking.event.dto.EventBookingResponseDto createEventBookingAsDto(com.MyBooking.event.dto.EventBookingCreateRequestDto request, Long userId) {
-        // Get event and validate
-        Event event = getEventById(request.getEventId());
+        if (request == null || request.getEventId() == null) {
+            throw new BusinessRuleException("Event ID is required");
+        }
+        
+        // Acquire pessimistic write lock on the event to serialize concurrent bookings
+        Event event = eventRepository.findByIdForUpdate(request.getEventId())
+            .orElseThrow(() -> new NotFoundException("Event not found with ID: " + request.getEventId()));
+        
+        // Enforce temporal invariant: event must be in the future [INV-EVT-002]
+        if (event.getStartAt().isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("Cannot book an event that has already started or taken place");
+        }
         
         // Get user and validate
         User user = userRepository.findById(userId)
@@ -694,10 +705,18 @@ public class EventService {
         // Validate participant count
         Integer numberOfParticipants = request.getNumberOfParticipants() != null ? request.getNumberOfParticipants() : 1;
         if (numberOfParticipants < 1) {
-            throw new IllegalArgumentException("Number of participants must be at least 1");
+            throw new BusinessRuleException("Number of participants must be at least 1");
         }
-        if (numberOfParticipants > event.getCapacity()) {
-            throw new IllegalArgumentException("Number of participants exceeds event capacity of " + event.getCapacity());
+        
+        // Query aggregate confirmed participants and enforce capacity invariant [INV-EVT-001]
+        int currentBooked = eventBookingRepository.countConfirmedParticipantsByEventId(event.getId());
+        int remainingCapacity = event.getCapacity() - currentBooked;
+        if (numberOfParticipants > remainingCapacity) {
+            throw new BusinessRuleException(
+                "Event capacity exceeded. Requested: " + numberOfParticipants + 
+                ", remaining capacity: " + remainingCapacity + 
+                " (Total capacity: " + event.getCapacity() + ", currently booked: " + currentBooked + ")"
+            );
         }
         
         // Create event booking
@@ -754,6 +773,7 @@ public class EventService {
     /**
      * Cancel event booking as DTO
      */
+    @Transactional
     public com.MyBooking.event.dto.EventBookingResponseDto cancelEventBookingAsDto(Long bookingId, Long userId, String reason) {
         EventBooking booking = eventBookingRepository.findById(bookingId)
             .orElseThrow(() -> new NotFoundException("Event booking not found with ID: " + bookingId));

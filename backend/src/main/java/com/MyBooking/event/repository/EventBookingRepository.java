@@ -241,6 +241,17 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
     // ==================== PARTICIPANT-BASED QUERIES ====================
     
     /**
+     * Count total confirmed participants for an event.
+     * Enforces aggregate participant summation invariant [INV-EVT-001].
+     * 
+     * @param eventId the event ID
+     * @return total confirmed participants across all active bookings
+     */
+    @Query("SELECT COALESCE(SUM(eb.numberOfParticipants), 0) FROM EventBooking eb " +
+           "WHERE eb.event.id = :eventId AND eb.status = 'CONFIRMED'")
+    int countConfirmedParticipantsByEventId(@Param("eventId") Long eventId);
+    
+    /**
      * Find event bookings by number of participants range.
      * Used for filtering bookings within a participant range.
      * 

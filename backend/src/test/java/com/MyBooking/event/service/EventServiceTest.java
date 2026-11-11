@@ -28,7 +28,17 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 
+import com.MyBooking.auth.domain.User;
+import com.MyBooking.auth.domain.Role;
+import com.MyBooking.auth.repository.UserRepository;
+import com.MyBooking.reservation.repository.ReservationRepository;
+import com.MyBooking.event.dto.EventBookingCreateRequestDto;
+import com.MyBooking.event.dto.EventBookingResponseDto;
+import com.MyBooking.event.domain.EventBooking;
+import com.MyBooking.event.domain.EventBookingStatus;
+
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
@@ -51,11 +61,18 @@ class EventServiceTest {
     @Mock
     private InstallationRepository installationRepository;
 
+    @Mock
+    private UserRepository userRepository;
+
+    @Mock
+    private ReservationRepository reservationRepository;
+
     @InjectMocks
     private EventService eventService;
 
     private Event testEvent;
     private Installation testInstallation;
+    private User testUser;
     private LocalDateTime testStartTime;
     private LocalDateTime testEndTime;
 
@@ -86,6 +103,10 @@ class EventServiceTest {
         testEvent.setPrice(new BigDecimal("230.00")); // 100 * 2 hours + 15% service fee
         testEvent.setCurrency("USD");
         testEvent.setInstallation(testInstallation);
+
+        // Setup test user
+        testUser = new User("Alice", "Smith", "alice@example.com", "password", "1234567890", "123 Main St", LocalDate.of(1990, 1, 1), Role.CLIENT);
+        testUser.setId(1L);
     }
 
     // ========== CORE EVENT MANAGEMENT TESTS ==========
@@ -516,5 +537,107 @@ class EventServiceTest {
 
         // Then
         assertThat(result).isEqualTo(new BigDecimal("0.00"));
+    }
+
+    // ========== EVENT BOOKING TESTS (P3-T03: INV-EVT-001, INV-EVT-002) ==========
+
+    @Test
+    void createEventBookingAsDto_WithinRemainingCapacity_ShouldSucceed() {
+        // Given
+        EventBookingCreateRequestDto request = new EventBookingCreateRequestDto();
+        request.setEventId(1L);
+        request.setNumberOfParticipants(5);
+
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEvent));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(eventBookingRepository.countConfirmedParticipantsByEventId(1L)).thenReturn(10); // 10 booked out of 20
+        when(eventBookingRepository.save(any(EventBooking.class))).thenAnswer(invocation -> {
+            EventBooking b = invocation.getArgument(0);
+            b.setId(100L);
+            return b;
+        });
+
+        // When
+        EventBookingResponseDto response = eventService.createEventBookingAsDto(request, 1L);
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.getId()).isEqualTo(100L);
+        assertThat(response.getStatus()).isEqualTo(EventBookingStatus.CONFIRMED);
+
+        verify(eventRepository).findByIdForUpdate(1L);
+        verify(eventBookingRepository).countConfirmedParticipantsByEventId(1L);
+        verify(eventBookingRepository).save(any(EventBooking.class));
+    }
+
+    @Test
+    void createEventBookingAsDto_ExceedingRemainingCapacity_ShouldThrowBusinessRuleException() {
+        // Given
+        EventBookingCreateRequestDto request = new EventBookingCreateRequestDto();
+        request.setEventId(1L);
+        request.setNumberOfParticipants(15); // Requests 15, but 10 are already booked out of 20 capacity
+
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEvent));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(eventBookingRepository.countConfirmedParticipantsByEventId(1L)).thenReturn(10);
+
+        // When & Then
+        assertThatThrownBy(() -> eventService.createEventBookingAsDto(request, 1L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Event capacity exceeded");
+
+        verify(eventRepository).findByIdForUpdate(1L);
+        verify(eventBookingRepository).countConfirmedParticipantsByEventId(1L);
+        verify(eventBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void createEventBookingAsDto_ForPastEvent_ShouldThrowBusinessRuleException() {
+        // Given
+        Event pastEvent = new Event();
+        pastEvent.setId(2L);
+        pastEvent.setCapacity(20);
+        pastEvent.setStartAt(LocalDateTime.now().minusDays(1)); // Yesterday
+        pastEvent.setEndAt(LocalDateTime.now().minusDays(1).plusHours(2));
+
+        EventBookingCreateRequestDto request = new EventBookingCreateRequestDto();
+        request.setEventId(2L);
+        request.setNumberOfParticipants(2);
+
+        when(eventRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(pastEvent));
+
+        // When & Then
+        assertThatThrownBy(() -> eventService.createEventBookingAsDto(request, 1L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Cannot book an event that has already started or taken place");
+
+        verify(eventRepository).findByIdForUpdate(2L);
+        verify(eventBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void cancelEventBookingAsDto_ShouldTransitionStatusToCancelled() {
+        // Given
+        EventBooking booking = new EventBooking();
+        booking.setId(10L);
+        booking.setEvent(testEvent);
+        booking.setClient(testUser);
+        booking.setStatus(EventBookingStatus.CONFIRMED);
+        booking.setEventDateTime(LocalDateTime.now().plusDays(2));
+        booking.setNumberOfParticipants(4);
+
+        when(eventBookingRepository.findById(10L)).thenReturn(Optional.of(booking));
+        when(eventBookingRepository.save(any(EventBooking.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        // When
+        EventBookingResponseDto response = eventService.cancelEventBookingAsDto(10L, 1L, "Guest schedule conflict");
+
+        // Then
+        assertThat(response).isNotNull();
+        assertThat(response.getStatus()).isEqualTo(EventBookingStatus.CANCELLED);
+        assertThat(booking.getStatus()).isEqualTo(EventBookingStatus.CANCELLED);
+
+        verify(eventBookingRepository).findById(10L);
+        verify(eventBookingRepository).save(booking);
     }
 }

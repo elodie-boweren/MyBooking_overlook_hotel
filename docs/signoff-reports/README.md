@@ -12,7 +12,8 @@ Each sign-off report captures the comprehensive technical breakdown, architectur
 | :--- | :--- | :--- | :--- | :--- |
 | **Phase 01** | Modular Monolith Foundation & Test Harness | Completed | 1,086 / 1,086 | *Phase 1 legacy baseline* |
 | **Phase 02** | Zero-Trust Security & Identity Hardening | **Accepted & Signed Off** | **1,134 / 1,134 (100%)** | [Phase 2 Sign-off Report](phase-2-signoff-report.md) |
-| **Phase 03** | Dual-Key Public UUID Architecture & Anti-Enumeration | Pending | TBD | *Upcoming Phase 3* |
+| **Phase 03** | Domain Refactoring & Reservation Core Fixes | In Progress | 1,150 / 1,150 (100%) | [Phase 3 Sign-off Report](phase-3-signoff-report.md) |
+| **Milestone IdP** | Keycloak Identity Provider, Next.js BFF & Public UUIDv7 | Pending | TBD | *Upcoming Milestone IdP* |
 
 ---
 

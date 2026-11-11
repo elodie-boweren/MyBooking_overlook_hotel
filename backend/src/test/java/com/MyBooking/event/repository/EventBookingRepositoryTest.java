@@ -381,6 +381,32 @@ class EventBookingRepositoryTest {
         assertThat(bookings).extracting("status").containsOnly(EventBookingStatus.CONFIRMED);
     }
 
+    @Test
+    void testCountConfirmedParticipantsByEventId_SumsConfirmedParticipants() {
+        int total = eventBookingRepository.countConfirmedParticipantsByEventId(conferenceEvent.getId());
+        // conferenceBooking (25) + expensiveBooking (50) = 75
+        assertThat(total).isEqualTo(75);
+    }
+
+    @Test
+    void testCountConfirmedParticipantsByEventId_ExcludesCancelledBookings() {
+        int total = eventBookingRepository.countConfirmedParticipantsByEventId(spaEvent.getId());
+        // spaBooking (1 confirmed) + cancelledBooking (1 cancelled) = 1
+        assertThat(total).isEqualTo(1);
+    }
+
+    @Test
+    void testCountConfirmedParticipantsByEventId_WithNoBookings_ReturnsZero() {
+        Event unusedEvent = new Event("Empty Event", EventType.FITNESS,
+                                      LocalDateTime.of(2024, 3, 1, 10, 0),
+                                      LocalDateTime.of(2024, 3, 1, 12, 0),
+                                      30, new BigDecimal("50.00"), "USD", conferenceInstallation);
+        entityManager.persistAndFlush(unusedEvent);
+
+        int total = eventBookingRepository.countConfirmedParticipantsByEventId(unusedEvent.getId());
+        assertThat(total).isEqualTo(0);
+    }
+
     // ==================== PAGINATION TESTS ====================
 
     @Test

@@ -157,7 +157,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
      * @param checkOut check-out date
      * @return list of available rooms for the date range
      */
-    @Query("SELECT r FROM Room r WHERE r.status = 'AVAILABLE' AND r.id NOT IN " +
+    @Query("SELECT r FROM Room r WHERE r.status != 'OUT_OF_SERVICE' AND r.id NOT IN " +
            "(SELECT res.room.id FROM Reservation res WHERE " +
            "res.status = 'CONFIRMED' AND " +
            "(res.checkIn < :checkOut AND res.checkOut > :checkIn))")
@@ -176,7 +176,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
      * @param minCapacity minimum capacity (optional)
      * @return list of available rooms for the date range
      */
-    @Query("SELECT r FROM Room r WHERE r.status = 'AVAILABLE' AND r.id NOT IN " +
+    @Query("SELECT r FROM Room r WHERE r.status != 'OUT_OF_SERVICE' AND r.id NOT IN " +
            "(SELECT res.room.id FROM Reservation res WHERE " +
            "res.status = 'CONFIRMED' AND " +
            "(res.checkIn < :checkOut AND res.checkOut > :checkIn)) AND " +
@@ -198,7 +198,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
      * @param pageable pagination information
      * @return page of available rooms for the date range
      */
-    @Query("SELECT r FROM Room r WHERE r.status = 'AVAILABLE' AND r.id NOT IN " +
+    @Query("SELECT r FROM Room r WHERE r.status != 'OUT_OF_SERVICE' AND r.id NOT IN " +
            "(SELECT res.room.id FROM Reservation res WHERE " +
            "res.status = 'CONFIRMED' AND " +
            "(res.checkIn < :checkOut AND res.checkOut > :checkIn))")
@@ -219,7 +219,7 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
      * @param pageable pagination information
      * @return page of available rooms for the date range
      */
-    @Query("SELECT r FROM Room r WHERE r.status = 'AVAILABLE' AND " +
+    @Query("SELECT r FROM Room r WHERE r.status != 'OUT_OF_SERVICE' AND " +
            "(:roomType IS NULL OR r.roomType = :roomType) AND " +
            "(:minCapacity IS NULL OR r.capacity >= :minCapacity) AND " +
            "r.id NOT IN (SELECT res.room.id FROM Reservation res WHERE " +

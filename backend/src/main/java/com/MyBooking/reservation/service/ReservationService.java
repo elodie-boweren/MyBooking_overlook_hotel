@@ -74,6 +74,9 @@ public class ReservationService {
         // Validate room capacity
         validateRoomCapacity(room, numberOfGuests);
         
+        // Validate room operational status (OUT_OF_SERVICE cannot be booked)
+        validateRoomOperationalStatus(room);
+        
         // Check room availability
         checkRoomAvailability(roomId, checkIn, checkOut);
         
@@ -100,10 +103,6 @@ public class ReservationService {
             // Log the error but don't fail the reservation creation
             System.err.println("Failed to process loyalty points for reservation " + savedReservation.getId() + ": " + e.getMessage());
         }
-        
-        // Update room status to occupied for the entire reservation period
-        roomService.updateRoomStatusAutomatically(roomId, RoomStatus.OCCUPIED, 
-            "Reservation created for " + checkIn + " to " + checkOut);
         
         return savedReservation;
     }
@@ -136,10 +135,11 @@ public class ReservationService {
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + roomId));
 
-        if (numberOfGuests > room.getCapacity()) {
-            throw new BusinessRuleException("Number of guests (" + numberOfGuests + 
-                ") exceeds room capacity (" + room.getCapacity() + ")");
-        }
+        // Validate room capacity
+        validateRoomCapacity(room, numberOfGuests);
+        
+        // Validate room operational status
+        validateRoomOperationalStatus(room);
 
         // Get and validate client
         User client = userRepository.findById(clientId)
@@ -191,10 +191,6 @@ public class ReservationService {
             // Log the error but don't fail the reservation creation
             System.err.println("Failed to process loyalty points for reservation " + savedReservation.getId() + ": " + e.getMessage());
         }
-        
-        // Update room status to occupied for the entire reservation period
-        roomService.updateRoomStatusAutomatically(roomId, RoomStatus.OCCUPIED, 
-            "Reservation created for " + checkIn + " to " + checkOut);
         
         return savedReservation;
     }
@@ -300,6 +296,15 @@ public class ReservationService {
     }
 
     /**
+     * Validate room operational readiness (INV-ROM-001 / INV-ROM-002)
+     */
+    private void validateRoomOperationalStatus(Room room) {
+        if (room.getStatus() == RoomStatus.OUT_OF_SERVICE) {
+            throw new BusinessRuleException("Room " + room.getNumber() + " is currently out of service and cannot be reserved");
+        }
+    }
+
+    /**
      * Check room availability for new reservation
      */
     private void checkRoomAvailability(Long roomId, LocalDate checkIn, LocalDate checkOut) {
@@ -396,10 +401,6 @@ public class ReservationService {
         // Update reservation status
         reservation.setStatus(ReservationStatus.CANCELLED);
         reservationRepository.save(reservation);
-        
-        // Update room status back to available when reservation is cancelled
-        roomService.updateRoomStatusAutomatically(reservation.getRoom().getId(), RoomStatus.AVAILABLE, 
-            "Reservation cancelled: " + reason);
     }
 
     /**
@@ -434,8 +435,9 @@ public class ReservationService {
         // Get all rooms from the system
         List<Room> allRooms = roomRepository.findAll();
         
-        // Filter by capacity and availability
+        // Filter by operational readiness, capacity and calendar availability
         return allRooms.stream()
+            .filter(room -> room.getStatus() != RoomStatus.OUT_OF_SERVICE)
             .filter(room -> room.getCapacity() >= numberOfGuests)
             .filter(room -> isRoomAvailable(room.getId(), checkIn, checkOut))
             .toList();
@@ -747,6 +749,10 @@ public class ReservationService {
         // Validate new room
         Room newRoom = roomRepository.findById(newRoomId)
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + newRoomId));
+        
+        // Validate new room capacity and operational status
+        validateRoomCapacity(newRoom, reservation.getNumberOfGuests());
+        validateRoomOperationalStatus(newRoom);
         
         // Check if new room is available for the reservation dates
         checkRoomAvailabilityForUpdate(newRoomId, reservation.getCheckIn(), reservation.getCheckOut(), id);

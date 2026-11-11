@@ -237,6 +237,27 @@ class RoomServiceTest {
         verify(roomRepository).findById(roomId);
         verify(reservationRepository, never()).checkRoomAvailability(anyLong(), any(), any());
     }
+
+    @Test
+    void isRoomAvailable_WithOccupiedRoom_ShouldReturnTrueWhenNoOverlappingReservations() {
+        // Given - Room physically occupied today, but no overlapping reservation on requested future dates
+        Long roomId = 1L;
+        testRoom.setStatus(RoomStatus.OCCUPIED);
+        LocalDate checkIn = LocalDate.now().plusDays(5);
+        LocalDate checkOut = LocalDate.now().plusDays(10);
+        
+        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut))
+            .thenReturn(List.of());
+        
+        // When
+        boolean result = roomService.isRoomAvailable(roomId, checkIn, checkOut);
+        
+        // Then - Decoupled dynamic availability allows booking
+        assertThat(result).isTrue();
+        verify(roomRepository).findById(roomId);
+        verify(reservationRepository).checkRoomAvailability(roomId, checkIn, checkOut);
+    }
     
     @Test
     void isRoomAvailable_WithOverlappingReservations_ShouldReturnFalse() {

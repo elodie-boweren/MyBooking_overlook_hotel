@@ -123,7 +123,25 @@ class ReservationServiceTest {
         verify(userRepository).findById(1L);
         verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
         verify(reservationRepository).save(any(Reservation.class));
-        verify(roomService).updateRoomStatusAutomatically(eq(1L), eq(RoomStatus.OCCUPIED), anyString());
+        verify(roomService, never()).updateRoomStatusAutomatically(anyLong(), any(), anyString());
+    }
+
+    @Test
+    void createReservation_WhenRoomIsOutOfService_ShouldThrowBusinessRuleException() {
+        // Given
+        testRoom.setStatus(RoomStatus.OUT_OF_SERVICE);
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        
+        // When & Then
+        assertThatThrownBy(() -> reservationService.createReservation(1L, 1L, testCheckIn, testCheckOut, 2, "USD"))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("is currently out of service and cannot be reserved");
+        
+        verify(roomRepository).findById(1L);
+        verify(userRepository).findById(1L);
+        verify(reservationRepository, never()).save(any());
+        verify(roomService, never()).updateRoomStatusAutomatically(anyLong(), any(), anyString());
     }
 
     @Test
@@ -338,7 +356,7 @@ class ReservationServiceTest {
         
         verify(reservationRepository).findById(1L);
         verify(reservationRepository).save(testReservation);
-        verify(roomService).updateRoomStatusAutomatically(eq(1L), eq(RoomStatus.AVAILABLE), anyString());
+        verify(roomService, never()).updateRoomStatusAutomatically(anyLong(), any(), anyString());
     }
 
     @Test
@@ -418,6 +436,24 @@ class ReservationServiceTest {
         
         verify(roomRepository).findAll();
         verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
+    }
+
+    @Test
+    void getAvailableRooms_ShouldExcludeOutOfServiceRooms() {
+        // Given
+        Room oosRoom = new Room("999", RoomType.SINGLE, 2, new BigDecimal("100.00"), "USD", RoomStatus.OUT_OF_SERVICE);
+        oosRoom.setId(999L);
+        when(roomRepository.findAll()).thenReturn(List.of(testRoom, oosRoom));
+        when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
+            .thenReturn(Collections.emptyList());
+        
+        // When
+        List<Room> result = reservationService.getAvailableRooms(testCheckIn, testCheckOut, 2);
+        
+        // Then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0)).isEqualTo(testRoom);
+        verify(reservationRepository, never()).checkRoomAvailability(eq(999L), any(), any());
     }
 
     // ========== BUSINESS LOGIC TESTS ==========

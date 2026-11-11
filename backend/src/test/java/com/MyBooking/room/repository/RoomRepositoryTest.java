@@ -353,12 +353,13 @@ class RoomRepositoryTest {
         LocalDate checkIn = LocalDate.now().plusDays(1);
         LocalDate checkOut = LocalDate.now().plusDays(3);
 
-        // When - This will return all available rooms since we have no reservations
+        // When - Returns all operational rooms (status != OUT_OF_SERVICE) since there are no overlapping reservations
         List<Room> availableRooms = roomRepository.findAvailableRoomsForDateRange(checkIn, checkOut);
 
-        // Then
-        assertThat(availableRooms).hasSize(4); // All available rooms
-        assertThat(availableRooms).extracting(Room::getStatus).containsOnly(RoomStatus.AVAILABLE);
+        // Then - Should include 4 AVAILABLE rooms + 1 OCCUPIED room (5 total), strictly excluding OUT_OF_SERVICE
+        assertThat(availableRooms).hasSize(5);
+        assertThat(availableRooms).extracting(Room::getStatus)
+            .doesNotContain(RoomStatus.OUT_OF_SERVICE);
     }
 
     @Test
@@ -371,9 +372,9 @@ class RoomRepositoryTest {
         // When
         Page<Room> page = roomRepository.findAvailableRoomsForDateRange(checkIn, checkOut, pageable);
 
-        // Then
+        // Then - 5 operational rooms with page size 2 gives 3 pages
         assertThat(page.getContent()).hasSize(2);
-        assertThat(page.getTotalElements()).isEqualTo(4);
-        assertThat(page.getTotalPages()).isEqualTo(2);
+        assertThat(page.getTotalElements()).isEqualTo(5);
+        assertThat(page.getTotalPages()).isEqualTo(3);
     }
 }

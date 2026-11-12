@@ -42,9 +42,9 @@ PHASE 15: Kubernetes DevSecOps Deployment & Production Hardening
 * **Dependencies**: Phase 01.
 
 ### PHASE 03: Domain Refactoring & Reservation Core Fixes
-* **Objective**: Correct date overlap JPQL calculation, fix self-conflict on reservation updates, decouple static room status mutations from dynamic bookings, prevent event overbooking via capacity aggregation and pessimistic locking, enforce post-stay loyalty accrual and cancellation clawbacks, eliminate in-memory analytics heap scans with USALI metrics, wire announcement REST endpoints with department scoping, and stress-test concurrent domain invariants.
-* **Scope**: `ReservationRepository`, `ReservationService`, `EventService`, `LoyaltyService`, `EmployeeService`, `AnalyticsService`, `AnnouncementService`, `AnnouncementController`, `Department` domain attribute, date and capacity validation invariants.
-* **Deliverables**: Interval overlap tests passing, back-to-back booking support, event pessimistic locking, loyalty non-negative balance and clawback, leave exclusivity, database-level analytics aggregations (ADR/RevPAR/Occupancy), secured announcement REST API, 100% passing concurrency stress test suite.
+* **Objective**: Correct date overlap JPQL calculation, fix self-conflict on reservation updates, decouple static room status mutations from dynamic bookings, prevent event overbooking via capacity aggregation and pessimistic locking, enforce post-stay loyalty accrual and cancellation clawbacks, eliminate in-memory analytics heap scans with USALI metrics, wire announcement REST endpoints with department scoping, harden installation availability push-down queries with event update self-exclusion, and stress-test concurrent domain invariants.
+* **Scope**: `ReservationRepository`, `ReservationService`, `EventService`, `EventRepository`, `InstallationService`, `LoyaltyService`, `EmployeeService`, `AnalyticsService`, `AnnouncementService`, `AnnouncementController`, `Department` domain attribute, date and capacity validation invariants.
+* **Deliverables**: Interval overlap tests passing, back-to-back booking support, event pessimistic locking, loyalty non-negative balance and clawback, leave exclusivity, database-level analytics aggregations (ADR/RevPAR/Occupancy), secured announcement REST API, push-down installation availability, 100% passing concurrency stress test suite.
 * **Dependencies**: Phase 02.
 
 ### MILESTONE IdP: Keycloak Identity Provider Adoption, Next.js BFF & Public UUIDv7 Architecture
@@ -54,15 +54,15 @@ PHASE 15: Kubernetes DevSecOps Deployment & Production Hardening
 * **Dependencies**: Phase 03.
 
 ### PHASE 04: Modular Monolith Bounded Contexts & PostgreSQL Schema Isolation
-* **Objective**: Separate the monolithic PostgreSQL schema into logical schemas (`auth`, `inventory`, `booking`, `loyalty`, `operations`) via Flyway migrations, reflecting the new externalized credential model.
+* **Objective**: Separate the monolithic PostgreSQL schema into logical schemas (`auth`, `inventory`, `booking`, `loyalty`, `operations`) via Flyway migrations, reflecting the new externalized credential model, and introduce enterprise hospitality domain capabilities (Multi-Dimensional Feedback & NPS, Banquet Event Orders with seating layouts & turnaround buffers, Housekeeping Room Credits & SOP Checklists).
 * **Scope**: Flyway DDL scripts (`V9__*`), package-private encapsulation, eliminate cross-domain SQL joins, update Merise documentation (MCD, MLD, MPD in `modelisation/`).
-* **Deliverables**: Isolated schemas, domain aggregate models, ADR-0005, ADR-0017.
+* **Deliverables**: Isolated schemas, rich hospitality domain aggregate models, ADR-0005, ADR-0017.
 * **Dependencies**: Milestone IdP.
 
 ### PHASE 05: Transactional Outbox & In-Memory Domain Events
-* **Objective**: Decouple state mutations from side-effects using the Transactional Outbox pattern and Spring Application Events.
+* **Objective**: Decouple state mutations from side-effects using the Transactional Outbox pattern and Spring Application Events, enabling automated post-checkout guest review invitations and operational workflow triggers.
 * **Scope**: `outbox` table, Outbox Relay worker, `notification-service` initial module.
-* **Deliverables**: Outbox event infrastructure, domain event catalog, ADR-0006.
+* **Deliverables**: Outbox event infrastructure, domain event catalog, automated post-stay triggers, ADR-0006.
 * **Dependencies**: Phase 04.
 
 ### PHASE 06: C++20 Dynamic Pricing & Yield Engine Integration
@@ -90,15 +90,15 @@ PHASE 15: Kubernetes DevSecOps Deployment & Production Hardening
 * **Dependencies**: Phase 08.
 
 ### PHASE 10: Database-per-Service Migration & Analytics Service in Go
-* **Objective**: Isolate database instances completely per service and deploy `analytics-service` in Go streaming Kafka events into ClickHouse.
-* **Scope**: Microservice #11 (`analytics-service`), ClickHouse OLAP schema, database network segmentation.
-* **Deliverables**: Sub-second RevPAR/ADR aggregations across 10M rows, ADR-0014.
+* **Objective**: Isolate database instances completely per service and deploy `analytics-service` in Go streaming Kafka events into ClickHouse using micro-batching and scheduled rollup jobs (02:00 AM Night Audit, hourly Pacing & Pickup, Comp-Set MPI/ARI/RGI indexing).
+* **Scope**: Microservice #11 (`analytics-service`), Go micro-batch consumer, ClickHouse OLAP schema & materialized views, cron rollup workers, database network segmentation.
+* **Deliverables**: Sub-second RevPAR/ADR aggregations across 10M rows, automated Night Audit snapshots, ADR-0014.
 * **Dependencies**: Phase 09.
 
 ### PHASE 11: AI Agent Platform & Deterministic Policy Guard Layer
-* **Objective**: Build sandboxed AI Agent Gateway with prompt-injection defense and RBAC authorization tool layers.
-* **Scope**: AI Model Gateway, RAG vector store (pgvector/Redis), deterministic policy checker, human-in-the-loop approval.
-* **Deliverables**: AI guest concierge, AI operational copilot, ADR-0010.
+* **Objective**: Build sandboxed AI Agent Gateway with prompt-injection defense, RBAC authorization tool layers, and AI Feedback Sentiment Analysis with operational auto-triage (dispatching P1 EmployeeTasks for negative stays).
+* **Scope**: AI Model Gateway, RAG vector store (pgvector/Redis), deterministic policy checker, human-in-the-loop approval, NLP feedback triage pipeline.
+* **Deliverables**: AI guest concierge, AI operational copilot, automated feedback sentiment triage, ADR-0010.
 * **Dependencies**: Phase 10.
 
 ### PHASE 12: Rust IoT Edge Gateway & Smart Room Telemetry

@@ -4,9 +4,9 @@
 - **Phase**: Phase 03 — Domain Refactoring & Reservation Core Fixes
 - **Feature Branch**: `feature/phase-3-domain-refactoring`
 - **Execution Date**: November 2026
-- **Status**: **IN PROGRESS (P3-T01 through P3-T05 Verified; P3-T07 & P3-T08 in execution prior to P3-T06 Concurrency Stress Test)**
-- **Test Suite Status**: **1,160 / 1,160 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
-- **Authoritative Invariants**: `INV-RES-001`, `INV-RES-002`, `INV-RES-003`, `INV-ROOM-001`, `INV-EVT-001`, `INV-EVT-002`, `INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`, `INV-EMP-001`, `INV-EMP-002`, `INV-ANL-001`, `INV-ANL-002`, `INV-ANN-001` (documented in `docs/architecture/domain-invariants.md`)
+- **Status**: **IN PROGRESS (P3-T01 through P3-T05 & P3-T07 Verified; P3-T08 & P3-T09 in queue prior to P3-T06 Concurrency Stress Test)**
+- **Test Suite Status**: **1,166 / 1,166 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
+- **Authoritative Invariants**: `INV-RES-001`, `INV-RES-002`, `INV-RES-003`, `INV-ROOM-001`, `INV-EVT-001`, `INV-EVT-002`, `INV-EVT-003`, `INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`, `INV-EMP-001`, `INV-EMP-002`, `INV-ANL-001`, `INV-ANL-002`, `INV-ANN-001` (documented in `docs/architecture/domain-invariants.md`)
 
 ---
 
@@ -25,6 +25,7 @@
    - [P3-T05: Employee Leave Integrity, Shift Overlap & Feedback Status Guard](#p3-t05-employee-leave-integrity-shift-overlap--feedback-status-guard)
    - [P3-T07: Analytics Query Hardening, Heap Scan Elimination & USALI Real Financial Metrics](#p3-t07-analytics-query-hardening-heap-scan-elimination--usali-real-financial-metrics)
    - [P3-T08: Department Domain Model & Announcement REST API with Audience Scoping](#p3-t08-department-domain-model--announcement-rest-api-with-audience-scoping)
+   - [P3-T09: Installation Availability Query Hardening & Event Update Self-Exclusion](#p3-t09-installation-availability-query-hardening--event-update-self-exclusion)
    - [P3-T06: Concurrency Stress Test Suite & Business Invariant Regression Harness](#p3-t06-concurrency-stress-test-suite--business-invariant-regression-harness)
 5. [Source Code Implementations of Key Components](#5-source-code-implementations-of-key-components)
 6. [Complete Test Harness & Verification Suite](#6-complete-test-harness--verification-suite)
@@ -184,6 +185,7 @@ While `@Version` serves as the optimal primary concurrency mechanism for normal 
 | `INV-ROOM-001`| Room Inventory | **Decoupled Availability Rule**: Booking availability is derived solely from the reservation calendar, not physical room status (`OCCUPIED`). Physical status only blocks bookings when `OUT_OF_SERVICE`. | `P3-T02` | `ReservationService.createReservation`, `RoomRepository.findAvailableRooms` | `ReservationServiceTest`, `RoomRepositoryTest` |
 | `INV-EVT-001` | Event | **Cumulative Participant Capacity Rule**: Total confirmed participants `SUM(numberOfParticipants)` plus incoming request must not exceed `event.maxParticipants`. | `P3-T03` | `EventBookingRepository.countConfirmedParticipantsByEventId`, `EventService` | `EventBookingRepositoryTest`, `EventServiceTest` |
 | `INV-EVT-002` | Event | **Future Event Booking Rule**: Event bookings can only be created for events whose `startDate` is strictly in the future (`startDate.isAfter(now)`). | `P3-T03` | `EventService.createEventBookingAsDto` | `EventServiceTest.createEventBooking_PastEvent_ThrowsBusinessRuleException` |
+| `INV-EVT-003` | Event & Installation | **Installation Push-Down & Update Self-Exclusion**: Installation availability must filter by `installationId` in SQL using canonical overlap math, excluding `excludeEventId` on updates. | `P3-T09` | `EventRepository`, `InstallationService`, `EventService` | `EventRepositoryTest`, `InstallationServiceTest` |
 | `INV-LOY-001` | Loyalty | **Non-Negative Balance Rule**: Loyalty account balance must never drop below zero; protected by `@Version` optimistic locking. | `P3-T04` | `LoyaltyAccount`, `LoyaltyService` | `LoyaltyAccountTest`, `LoyaltyServiceTest` |
 | `INV-LOY-002` | Loyalty | **Cancellation Clawback & 1:1 Refund**: Points earned are clawed back upon cancellation; redeemed points are refunded 1:1. | `P3-T04` | `LoyaltyService.clawbackReservationPoints`, `refundReservationPoints` | `LoyaltyServiceTest`, `ReservationServiceTest` |
 | `INV-LOY-003` | Loyalty | **Immutable Ledger Types**: Append-only ledger supporting `EARN`, `REDEEM`, `REFUND`, and `CLAWBACK`. | `P3-T04` | `LoyaltyTxType`, `LoyaltyTransaction` | `LoyaltyTransactionTest` |
@@ -268,6 +270,14 @@ While `@Version` serves as the optimal primary concurrency mechanism for normal 
   - Add `targetDepartment` and `targetRole` to `Announcement` domain entity.
   - Create full suite of DTOs (`AnnouncementResponseDto`, `AnnouncementCreateRequestDto`, `AnnouncementReplyRequestDto`).
   - Implement secured `AnnouncementController` (`/api/announcements`) with role/department filtering and acknowledgment capabilities.
+
+### P3-T09: Installation Availability Query Hardening & Event Update Self-Exclusion
+- **Problem**:
+  1. *Global Unfiltered Availability Scan (`AUD-EVT-003`, `INV-EVT-003`)*: `EventRepository.checkEventAvailability(startTime, endTime)` queried every event across all installations in the hotel, forcing `InstallationService.isInstallationAvailable` to filter by `installationId` in JVM memory.
+  2. *Event Update Self-Collision*: Updating an existing event collided with its own persisted database row because no `:excludeEventId` exemption existed.
+- **Solution Plan**:
+  - Rewrite `EventRepository` availability query to filter directly by `e.installation.id = :installationId` using canonical half-open interval math (`e.startAt < :endTime AND e.endAt > :startTime`) with optional `:excludeEventId` exemption.
+  - Remove in-memory stream filtering from `InstallationService.isInstallationAvailable` and wire self-exclusion into `EventService` updates.
 
 ### P3-T06: Concurrency Stress Test Suite & Business Invariant Regression Harness
 - **Problem**:
@@ -461,14 +471,15 @@ Full Maven test suite execution across all modules (`./mvnw test`):
 
 ## 8. Evolution Path to Milestone IdP & Phase 4
 
-Upon completion of tickets `P3-T01` through `P3-T08`, the full Phase 3 domain refactoring roadmap is certified:
+Upon completion of tickets `P3-T01` through `P3-T09`, the full Phase 3 domain refactoring roadmap is certified:
 - `P3-T01`: Reservation Overlap JPQL & Self-Conflict Exemption (`INV-RES-001`, `INV-RES-002`) — *COMPLETED*
 - `P3-T02`: Physical Room Status Decoupling (`INV-ROOM-001`) — *COMPLETED*
 - `P3-T03`: Event Participant Capacity Aggregation & Overbooking Prevention (`INV-EVT-001`, `INV-EVT-002`) — *COMPLETED*
 - `P3-T04`: Loyalty Points Post-Stay Accrual, Cancellation Clawback & Concurrency Hardening (`INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`) — *COMPLETED*
 - `P3-T05`: Employee Leave Integrity, Shift Overlap & Feedback Status Guard (`INV-EMP-001`, `INV-EMP-002`, `AUD-EMP-001`, `AUD-EMP-002`, `AUD-FDBK-001`) — *COMPLETED*
-- `P3-T07`: Analytics Query Hardening, Heap Scan Elimination & USALI Real Financial Metrics (`INV-ANL-001`, `INV-ANL-002`, `AUD-ANL-001`, `AUD-ANL-002`)
+- `P3-T07`: Analytics Query Hardening, Heap Scan Elimination & USALI Real Financial Metrics (`INV-ANL-001`, `INV-ANL-002`, `AUD-ANL-001`, `AUD-ANL-002`) — *COMPLETED*
 - `P3-T08`: Department Domain Model & Announcement REST API with Audience Scoping (`INV-ANN-001`, `AUD-ANN-001`, `AUD-ANN-002`)
+- `P3-T09`: Installation Availability Query Hardening & Event Update Self-Exclusion (`INV-EVT-003`, `AUD-EVT-003`)
 - `P3-T06`: Concurrency Stress Test Suite & Business Invariant Regression Harness (Final Capstone)
 
 The platform will then advance to **Milestone IdP**:

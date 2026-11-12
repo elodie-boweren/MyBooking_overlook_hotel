@@ -245,6 +245,14 @@ Summary of Audit Findings:
 - **Severity**: **Critical** | **Confidence**: **Confirmed**
 - **Roadmap Phase**: **Phase 03 Amendment / Scope Clarification** (Must be corrected before event outbox events in Phase 05).
 
+### Finding `AUD-EVT-003`: Global Unfiltered Installation Availability Scan & Update Self-Collision
+- **Domain**: Event & Installation Management
+- **Source**: `InstallationService.java` (L137–142), `EventRepository.java` (L286–291).
+- **Existing Behavior**: `checkEventAvailability(startTime, endTime)` queries every event across ALL installations in the hotel, then `InstallationService` filters by `installationId` in JVM memory. Furthermore, updating an existing event has no `excludeEventId` parameter, causing self-collision.
+- **Expected Behavior**: Push `e.installation.id = :installationId` into database JPQL using canonical half-open interval intersection (`e.startAt < :endTime AND e.endAt > :startTime`) with optional `:excludeEventId` exemption.
+- **Severity**: **Medium** | **Confidence**: **Confirmed**
+- **Roadmap Phase**: **Phase 03** (`P3-T09`).
+
 ### Finding `AUD-LOY-001`: Asymmetric Loyalty Earning & No Cancellation Clawback
 - **Domain**: Loyalty & Billing
 - **Source**: `ReservationService.java` (L95, L392), `LoyaltyService.java`.
@@ -344,6 +352,7 @@ Summary of Audit Findings:
 | `AUD-RES-004` | **Missing Functionality** | Introduce explicit reservation lifecycle states (`CHECKED_IN`, `CHECKED_OUT`). |
 | `AUD-EVT-001` | **Confirmed Defect** | Add participant aggregation query and capacity barrier in `EventService`. |
 | `AUD-EVT-002` | **Confirmed Defect** | Add transactional concurrency check on event booking. |
+| `AUD-EVT-003` | **Confirmed Defect** | Push `installationId` filter into `EventRepository` availability query with `excludeEventId`. |
 | `AUD-LOY-001` | **Confirmed Defect** | Defer loyalty earning to checkout, or implement cancellation reversal. |
 | `AUD-LOY-002` | **Confirmed Defect** | Add `@Version` column to `LoyaltyAccount` to eliminate lost updates. |
 | `AUD-ROOM-001`| **Confirmed Defect** | Decouple static room status from reservation queries. |
@@ -371,6 +380,7 @@ Every identified defect and limitation is traced directly to our authoritative 1
 | `AUD-RES-004` | Stay Lifecycle States | **Phase 03 / 04** | Partially Covered | Model states | Clarification | Phase 03 | Expand enum in Phase 3 |
 | `AUD-EVT-001` | Event Capacity Overbooking | **Phase 03** | **Uncovered (Domain Bug)** | Fix query & check | Proposed Amendment | Phase 02 | Implemented in `P3-T03` |
 | `AUD-EVT-002` | Event Booking Concurrency | **Phase 03** | Uncovered | Add lock | Proposed Amendment | Phase 02 | Implemented in `P3-T03` |
+| `AUD-EVT-003` | Unfiltered Installation Scan & Self-Collision | **Phase 03** | **Uncovered (Domain Bug)** | Push `installationId` + `excludeEventId` | Phase 3 Enhancement | Phase 02 | Implement in Phase 3 (`P3-T09`) |
 | `AUD-LOY-001` | Loyalty Point Earning/Clawback | **Phase 03 / 04** | Uncovered | Reversal logic | Proposed Amendment | Phase 02 | Implemented in `P3-T04` |
 | `AUD-LOY-002` | Loyalty Lost Update Concurrency| **Phase 03** | Uncovered | Add `@Version` | Proposed Amendment | Phase 02 | Implemented in `P3-T04` |
 | `AUD-ROOM-001`| Room Status Conflation | **Phase 03 / 04** | Partially Covered | Decouple in P3 | Clarification | Phase 03 | Implemented in `P3-T02` |
@@ -399,14 +409,15 @@ Every identified defect and limitation is traced directly to our authoritative 1
 ### Recommendation: Cohesive Domain Integrity in Phase 03
 Because Phase 04 performs **PostgreSQL Schema Isolation (Flyway `V9__*`)** and establishes Bounded Contexts, introducing domain schema isolation on top of defective business logic (overbooking events, infinite loyalty points, in-memory heap scanning crashes, orphan announcement modules) is an anti-pattern. 
 
-We recommend executing Phase 03 as **Domain Refactoring & Core Business Logic Fixes**, structured into 8 cohesive tickets with stress testing as the concluding capstone:
+We recommend executing Phase 03 as **Domain Refactoring & Core Business Logic Fixes**, structured into 9 cohesive tickets with stress testing as the concluding capstone:
 - **`P3-T01`**: Reservation JPQL Overlap Query Repair & Self-Conflict Elimination (`AUD-RES-001`, `AUD-RES-003`) — *COMPLETED*.
 - **`P3-T02`**: Decouple Room Operational Status from Reservation Lifecycle (`AUD-RES-002`, `AUD-ROOM-001`) — *COMPLETED*.
 - **`P3-T03`**: Event Capacity Aggregation & Overbooking Prevention (`AUD-EVT-001`, `AUD-EVT-002`) — *COMPLETED*.
 - **`P3-T04`**: Loyalty Lifecycle Correction (Cancellation Clawback & Optimistic Lock) (`AUD-LOY-001`, `AUD-LOY-002`) — *COMPLETED*.
 - **`P3-T05`**: Employee Leave Scheduling & Feedback Integrity (`AUD-EMP-001`, `AUD-EMP-002`, `AUD-FDBK-001`) — *COMPLETED*.
-- **`P3-T07`**: Analytics Service Query Hardening, Heap Scan Elimination & Real Financial Metrics (`AUD-ANL-001`, `AUD-ANL-002`).
+- **`P3-T07`**: Analytics Service Query Hardening, Heap Scan Elimination & Real Financial Metrics (`AUD-ANL-001`, `AUD-ANL-002`) — *COMPLETED*.
 - **`P3-T08`**: Department Domain Model & Announcement REST API with DTOs and Audience Scoping (`AUD-ANN-001`, `AUD-ANN-002`).
+- **`P3-T09`**: Installation Availability Query Hardening & Event Update Self-Exclusion (`AUD-EVT-003`).
 - **`P3-T06`**: Concurrency Stress Test Suite, Regression Harness & Phase 3 Sign-off Report (Capstone).
 
 *This preserves the exact sequence of the 15-phase roadmap, ensures zero orphan code or latent OOM bugs remain in the monolith, perfectly positions the platform for **Milestone IdP** (Keycloak + Next.js BFF + UUIDv7), and enters **Phase 04** with 100% mathematically and logically sound domain models.*

@@ -35,6 +35,7 @@ Invariant Index:
 │ INV-ROOM-002  │ Immutable Room Identifier & Unique Number Invariant    │ Inventory / Room     │ Baseline / P4 │
 │ INV-EVT-001   │ Aggregate Event Participant Capacity Invariant         │ Events & Activities  │ Phase 03      │
 │ INV-EVT-002   │ Event Booking Chronological Window Invariant           │ Events & Activities  │ Phase 03      │
+│ INV-EVT-003   │ Installation Availability Push-Down & Self-Exclusion   │ Events & Activities  │ Phase 03      │
 │ INV-LOY-001   │ Non-Negative Loyalty Account Balance                   │ Loyalty & Rewards    │ Phase 03      │
 │ INV-LOY-002   │ Symmetrical Point Earning & Cancellation Clawback      │ Loyalty & Rewards    │ Phase 03 / 04 │
 │ INV-LOY-003   │ Immutable Loyalty Transaction Ledger                   │ Loyalty & Rewards    │ Phase 03 / 04 │
@@ -158,8 +159,17 @@ Invariant Index:
 * **Domain Owner**: `Event` Bounded Context.
 * **Enforcement Layer**: Entity validation and Application Service checks.
 * **Concurrency Requirements**: Standard transaction.
-* **Current Status**: **SATISFIED** (Enforced in `EventService.cancelEventBookingAsDto`).
+* **Current Status**: **SATISFIED** (Enforced in `EventService.cancelEventBookingAsDto` and `createEventBookingAsDto`).
 * **Roadmap Phase**: Baseline / Phase 03.
+
+#### `INV-EVT-003`: Installation Availability Push-Down & Event Update Self-Exclusion
+* **Business Rule**: Physical installation availability checks must filter strictly at the database level by `installation.id` using canonical half-open interval intersection ($e.startAt < :endTime \land e.endAt > :startTime$), never scanning all hotel events into JVM memory. When updating an existing event, the check must exclude `:excludeEventId` to prevent self-collision.
+* **Domain Owner**: `Event` & `Installation` Bounded Contexts.
+* **Enforcement Layer**: `EventRepository` JPQL query invoked by `InstallationService` and `EventService`.
+* **Concurrency Requirements**: Standard read-committed transaction.
+* **Current Status**: **VIOLATED** (`checkEventAvailability` lacks `installationId` and `excludeEventId`; `InstallationService` filters in memory).
+* **Audit Finding**: `AUD-EVT-003`.
+* **Roadmap Phase**: **Phase 03 (`P3-T09`)**.
 
 ---
 

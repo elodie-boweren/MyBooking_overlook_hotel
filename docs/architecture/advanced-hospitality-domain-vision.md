@@ -396,6 +396,20 @@ To guarantee that the platform functions correctly under seasonal peaks:
   - 10,000 concurrent availability search queries/second ($p99 < 50$ ms).
   - 500 concurrent booking attempts targeting the *exact same room* $\rightarrow$ **Exactly 1 succeeds with 200 OK, 499 receive 409 Conflict / 400 Bad Request, with zero double-bookings and zero deadlocks**.
 
+### 6.5 Enterprise Extensions: Feedback, Banquet Operations & Go OLAP Pipelines
+
+1. **Multi-Dimensional Feedback, NPS & AI Operational Auto-Triage (`CAP-IND-007`, `CAP-DIFF-005`)**:
+   - **Phase 04 / 05**: Expand `Feedback` beyond a single 1–5 integer score to 5 USALI dimensions (*Cleanliness*, *Staff & Service*, *Room Comfort*, *Food & Amenities*, *Value*) plus Net Promoter Score (0–10). Trigger automated post-checkout review invitations 2 hours after departure via Transactional Outbox.
+   - **Phase 11 (AI Agent Platform)**: NLP sentiment analysis extracts negative themes (*"noisy AC"*, *"cold shower"*) and auto-dispatches a **P1 Urgent Task** to the General Manager / Maintenance with a 4-hour SLA.
+
+2. **Enterprise Banquet & Installation Operations (`CAP-IND-008`)**:
+   - **Phase 04**: Implement **Turnaround Buffers** (`setupDurationMinutes` + `teardownDurationMinutes`) automatically padded around event bookings, **Dynamic Seating Layout Capacities** (`THEATER`, `CLASSROOM`, `BANQUET`, `U_SHAPE`), **Banquet Event Orders (BEO)** bundling catering + AV equipment, and **Maintenance Blackout Windows** for facility repairs without dummy events.
+
+3. **Go Analytics Micro-Batching & Night Audit Rollup Engine (`CAP-ORIG-003`)**:
+   - **Phase 10**: Operate across two planes in Go + ClickHouse:
+     - *Streaming Micro-Batch Plane*: Buffer Kafka events in memory and flush vectorized batches (every 1,000 records or 500 ms) to ClickHouse, preventing columnar part fragmentation.
+     - *Scheduled Batch Rollup Plane*: Execute the **02:00 AM Night Audit Rollup** (finalizing official daily ADR, RevPAR, Occupancy), hourly **Pacing & Pickup** curve jobs, **Comp-Set Indexing** (MPI, ARI, RGI), and 3-sigma cancellation anomaly alerts.
+
 ---
 
 ## 7. Comprehensive Roadmap Traceability Matrix
@@ -410,13 +424,17 @@ Every proposed capability maps strictly into our existing 15-phase sequence:
 | `CAP-IND-004` | Tiered Loyalty Engine | Standard | **Phase 04 / Phase 05** | Model in Bounded Context | Phase 4 / 5 |
 | `CAP-IND-005` | Housekeeping & Room Inspection | Standard | **Phase 04 / Phase 14** | Model in P4, UI in P14 | Phase 4 & Phase 14 |
 | `CAP-IND-006` | Ancillary Inventory, Dining & Spa | Standard | **Phase 04** | Model Outlets & Menus | Phase 4 |
+| `CAP-IND-007` | Multi-Dimensional Feedback & NPS | Standard | **Phase 04 / Phase 05** | Category stars + Outbox triggers | Phase 4 & Phase 5 |
+| `CAP-IND-008` | Banquet Event Orders (BEO), Layouts & Buffers | Standard | **Phase 04** | Turnaround buffers, seating styles, blackouts | Phase 4 |
+| `CAP-IND-009` | Workforce Credits, SOP Checklists & Shift Swaps | Standard | **Phase 04 / Phase 08** | Credits & SOP in P4; Swaps in P8 | Phase 4 & Phase 8 |
 | `CAP-DIFF-001`| AI Guest Concierge & Copilot | Overlook | **Phase 11** | Core deliverable of Phase 11 | Phase 11 |
 | `CAP-DIFF-002`| Smart-Room IoT Personalization | Overlook | **Phase 12** | Core deliverable of Phase 12 | Phase 12 |
 | `CAP-DIFF-003`| Housekeeping Robotics Fleet | Overlook | **Phase 13** | Core deliverable of Phase 13 | Phase 13 |
 | `CAP-DIFF-004`| Themed Experience Packages | Overlook | **Phase 04** | Model in Events Context | Phase 4 |
+| `CAP-DIFF-005`| AI Feedback Sentiment & Auto-Triage | Overlook | **Phase 11** | NLP triage -> P1 EmployeeTask | Phase 11 |
 | `CAP-ORIG-001`| Dynamic Yield Pricing | Original | **Phase 06** | Core deliverable of Phase 6 | Phase 6 |
 | `CAP-ORIG-002`| Go Availability Search & High Load | Original | **Phase 07** | Core deliverable of Phase 7 | Phase 7 |
-| `CAP-ORIG-003`| ClickHouse Analytics & WORM | Original | **Phase 10** | Core deliverable of Phase 10 | Phase 10 |
+| `CAP-ORIG-003`| ClickHouse Analytics, Micro-Batching & Night Audit | Original | **Phase 10** | Streaming batch + Night Audit cron + Comp-set | Phase 10 |
 
 ---
 

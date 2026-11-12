@@ -853,6 +853,16 @@ public class EventService {
             booking.getUpdatedAt()
         );
     }
+
+    /**
+     * Calculate total revenue from confirmed event bookings within a date/time range.
+     * Replaces hardcoded mock analytics placeholders with indexed database push-down SUM (INV-ANL-002).
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal getTotalEventRevenueBetweenDates(LocalDateTime startDateTime, LocalDateTime endDateTime) {
+        return eventBookingRepository.calculateTotalRevenueBetweenDates(
+            startDateTime, endDateTime, EventBookingStatus.CONFIRMED);
+    }
     
     // ========== INNER CLASSES ==========
 

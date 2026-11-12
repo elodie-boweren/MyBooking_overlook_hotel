@@ -515,4 +515,22 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      */
     @Query("SELECT COALESCE(AVG(r.totalPrice), 0) FROM Reservation r WHERE r.status = 'CONFIRMED' AND r.currency = :currency")
     BigDecimal getAverageReservationPriceByCurrency(@Param("currency") String currency);
+
+    /**
+     * Find confirmed reservations overlapping with a specific calendar date range for analytics reporting.
+     * A reservation overlaps with [startDate, endDate] if its checkIn is on or before endDate
+     * and its checkOut is strictly after startDate.
+     * 
+     * @param startDate The query window start date (inclusive)
+     * @param endDate The query window end date (inclusive)
+     * @param status The reservation status
+     * @return List of overlapping reservations
+     */
+    @Query("SELECT r FROM Reservation r " +
+           "WHERE r.status = :status " +
+           "AND r.checkIn <= :endDate " +
+           "AND r.checkOut > :startDate")
+    List<Reservation> findOverlappingReservationsInDateRange(@Param("startDate") LocalDate startDate,
+                                                            @Param("endDate") LocalDate endDate,
+                                                            @Param("status") ReservationStatus status);
 }

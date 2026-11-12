@@ -558,6 +558,15 @@ public class ReservationService {
         return reservationRepository.getTotalRevenueByCurrency(currency);
     }
 
+    /**
+     * Get reservations overlapping with a specific date range for analytics.
+     * Replaces in-memory full table scanning with an indexed database query (INV-ANL-001).
+     */
+    @Transactional(readOnly = true)
+    public List<Reservation> getOverlappingReservationsInDateRange(LocalDate startDate, LocalDate endDate, ReservationStatus status) {
+        return reservationRepository.findOverlappingReservationsInDateRange(startDate, endDate, status);
+    }
+
     // ========== ADMIN OPERATIONS ==========
 
     /**

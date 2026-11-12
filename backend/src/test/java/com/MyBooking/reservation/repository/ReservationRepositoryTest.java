@@ -729,4 +729,22 @@ class ReservationRepositoryTest {
         assertThat(usdAverage).isEqualByComparingTo(new BigDecimal("933.333333333333")); // 2800 / 3 ≈ 933.33
         assertThat(eurAverage).isEqualByComparingTo(new BigDecimal("500.00")); // 500 / 1 = 500
     }
+
+    @Test
+    void testFindOverlappingReservationsInDateRange() {
+        // Query January 2024: Should find confirmed reservations 1, 2, 5 (excluding cancelled 3 and February 4)
+        List<Reservation> janReservations = reservationRepository.findOverlappingReservationsInDateRange(
+            LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31), ReservationStatus.CONFIRMED
+        );
+        assertThat(janReservations).hasSize(3);
+        assertThat(janReservations).extracting(Reservation::getId)
+            .containsExactlyInAnyOrder(reservation1.getId(), reservation2.getId(), reservation5.getId());
+
+        // Query February 2024: Should find only confirmed reservation 4
+        List<Reservation> febReservations = reservationRepository.findOverlappingReservationsInDateRange(
+            LocalDate.of(2024, 2, 1), LocalDate.of(2024, 2, 29), ReservationStatus.CONFIRMED
+        );
+        assertThat(febReservations).hasSize(1);
+        assertThat(febReservations.get(0).getId()).isEqualTo(reservation4.getId());
+    }
 }

@@ -9,17 +9,30 @@ public class RevenueAnalyticsDto {
     private BigDecimal totalRevenue;
     private Map<String, BigDecimal> revenueByService;
     private BigDecimal avgRevenuePerCustomer;
+    private BigDecimal adr;
+    private BigDecimal revPar;
+    private Double occupancyRate;
 
     // Constructors
     public RevenueAnalyticsDto() {}
 
     public RevenueAnalyticsDto(BigDecimal roomRevenue, BigDecimal eventRevenue, BigDecimal totalRevenue,
                               Map<String, BigDecimal> revenueByService, BigDecimal avgRevenuePerCustomer) {
+        this(roomRevenue, eventRevenue, totalRevenue, revenueByService, avgRevenuePerCustomer,
+             BigDecimal.ZERO, BigDecimal.ZERO, 0.0);
+    }
+
+    public RevenueAnalyticsDto(BigDecimal roomRevenue, BigDecimal eventRevenue, BigDecimal totalRevenue,
+                              Map<String, BigDecimal> revenueByService, BigDecimal avgRevenuePerCustomer,
+                              BigDecimal adr, BigDecimal revPar, Double occupancyRate) {
         this.roomRevenue = roomRevenue;
         this.eventRevenue = eventRevenue;
         this.totalRevenue = totalRevenue;
         this.revenueByService = revenueByService;
         this.avgRevenuePerCustomer = avgRevenuePerCustomer;
+        this.adr = adr;
+        this.revPar = revPar;
+        this.occupancyRate = occupancyRate;
     }
 
     // Getters and Setters
@@ -61,5 +74,29 @@ public class RevenueAnalyticsDto {
 
     public void setAvgRevenuePerCustomer(BigDecimal avgRevenuePerCustomer) {
         this.avgRevenuePerCustomer = avgRevenuePerCustomer;
+    }
+
+    public BigDecimal getAdr() {
+        return adr;
+    }
+
+    public void setAdr(BigDecimal adr) {
+        this.adr = adr;
+    }
+
+    public BigDecimal getRevPar() {
+        return revPar;
+    }
+
+    public void setRevPar(BigDecimal revPar) {
+        this.revPar = revPar;
+    }
+
+    public Double getOccupancyRate() {
+        return occupancyRate;
+    }
+
+    public void setOccupancyRate(Double occupancyRate) {
+        this.occupancyRate = occupancyRate;
     }
 }

@@ -533,4 +533,21 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
                                      @Param("minDuration") Integer minDuration,
                                      @Param("maxDuration") Integer maxDuration,
                                      Pageable pageable);
+
+    /**
+     * Calculate total revenue from confirmed event bookings within the specified date/time range.
+     * Uses database push-down SUM aggregation, replacing hardcoded mock numbers (AUD-ANL-002, INV-ANL-002).
+     * 
+     * @param startDateTime The start of the reporting window (inclusive)
+     * @param endDateTime The end of the reporting window (inclusive)
+     * @param status The booking status (typically CONFIRMED)
+     * @return Sum of total prices or 0.00
+     */
+    @Query("SELECT COALESCE(SUM(eb.totalPrice), 0) FROM EventBooking eb " +
+           "WHERE eb.status = :status " +
+           "AND eb.eventDateTime >= :startDateTime " +
+           "AND eb.eventDateTime <= :endDateTime")
+    BigDecimal calculateTotalRevenueBetweenDates(@Param("startDateTime") LocalDateTime startDateTime,
+                                                 @Param("endDateTime") LocalDateTime endDateTime,
+                                                 @Param("status") EventBookingStatus status);
 }

@@ -14,8 +14,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import com.MyBooking.reservation.domain.Reservation;
@@ -58,11 +60,11 @@ public class AnalyticsService {
     public Map<String, Object> getRevenueAnalytics(LocalDate startDate, LocalDate endDate) {
         Map<String, Object> analytics = new HashMap<>();
         
-        // Room revenue
+        // Room revenue (prorated per night, eliminating cross-month double counting: INV-ANL-002)
         BigDecimal roomRevenue = calculateRoomRevenue(startDate, endDate);
         analytics.put("roomRevenue", roomRevenue);
         
-        // Event revenue
+        // Event revenue (real confirmed bookings from database: INV-ANL-002)
         BigDecimal eventRevenue = calculateEventRevenue(startDate, endDate);
         analytics.put("eventRevenue", eventRevenue);
         
@@ -79,9 +81,28 @@ public class AnalyticsService {
         // Average revenue per customer
         long totalCustomers = getTotalActiveCustomers();
         BigDecimal avgRevenuePerCustomer = totalCustomers > 0 ? 
-            totalRevenue.divide(BigDecimal.valueOf(totalCustomers), 2, BigDecimal.ROUND_HALF_UP) : 
+            totalRevenue.divide(BigDecimal.valueOf(totalCustomers), 2, RoundingMode.HALF_UP) : 
             BigDecimal.ZERO;
         analytics.put("avgRevenuePerCustomer", avgRevenuePerCustomer);
+        
+        // USALI Hospitality Standard Metrics: ADR, RevPAR, Occupancy Rate
+        long occupiedRoomNights = calculateOccupiedRoomNights(startDate, endDate);
+        long totalRooms = roomService.getRoomStatistics().getTotalRooms();
+        long totalRoomNights = totalRooms * calculateDaysBetween(startDate, endDate);
+        
+        BigDecimal adr = occupiedRoomNights > 0 ?
+            roomRevenue.divide(BigDecimal.valueOf(occupiedRoomNights), 2, RoundingMode.HALF_UP) :
+            BigDecimal.ZERO;
+        analytics.put("adr", adr);
+        
+        BigDecimal revPar = totalRoomNights > 0 ?
+            roomRevenue.divide(BigDecimal.valueOf(totalRoomNights), 2, RoundingMode.HALF_UP) :
+            BigDecimal.ZERO;
+        analytics.put("revPar", revPar);
+        
+        double occupancyRate = totalRoomNights > 0 ?
+            (double) occupiedRoomNights / totalRoomNights * 100 : 0.0;
+        analytics.put("occupancyRate", occupancyRate);
         
         return analytics;
     }
@@ -134,6 +155,17 @@ public class AnalyticsService {
         metrics.put("roomOccupancyRate", roomOccupancyRate);
         metrics.put("occupiedRoomNights", occupiedRoomNights);
         metrics.put("totalRoomNights", totalRoomNights);
+        
+        // USALI metrics (ADR & RevPAR)
+        BigDecimal roomRevenue = calculateRoomRevenue(startDate, endDate);
+        BigDecimal adr = occupiedRoomNights > 0 ?
+            roomRevenue.divide(BigDecimal.valueOf(occupiedRoomNights), 2, RoundingMode.HALF_UP) :
+            BigDecimal.ZERO;
+        BigDecimal revPar = totalRoomNights > 0 ?
+            roomRevenue.divide(BigDecimal.valueOf(totalRoomNights), 2, RoundingMode.HALF_UP) :
+            BigDecimal.ZERO;
+        metrics.put("adr", adr);
+        metrics.put("revPar", revPar);
         
         // Installation utilization
         long totalInstallations = installationService.getTotalInstallationsCount();
@@ -297,22 +329,49 @@ public class AnalyticsService {
     // ==================== HELPER METHODS ====================
 
     private BigDecimal calculateRoomRevenue(LocalDate startDate, LocalDate endDate) {
-        // Get all confirmed reservations in the date range
-        List<Reservation> reservations = reservationService.getAllReservations().stream()
-            .filter(r -> r.getStatus() == ReservationStatus.CONFIRMED)
-            .filter(r -> !r.getCheckIn().isAfter(endDate) && !r.getCheckOut().isBefore(startDate))
-            .toList();
+        // Push-down database query fetching only reservations active in date range (INV-ANL-001)
+        List<Reservation> reservations = reservationService.getOverlappingReservationsInDateRange(
+            startDate, endDate, ReservationStatus.CONFIRMED);
         
-        return reservations.stream()
-            .map(Reservation::getTotalPrice)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalRoomRevenue = BigDecimal.ZERO;
+        for (Reservation r : reservations) {
+            totalRoomRevenue = totalRoomRevenue.add(calculateProratedRevenueForReservation(r, startDate, endDate));
+        }
+        return totalRoomRevenue;
+    }
+
+    private BigDecimal calculateProratedRevenueForReservation(Reservation r, LocalDate startDate, LocalDate endDate) {
+        if (r.getTotalPrice() == null || r.getTotalPrice().compareTo(BigDecimal.ZERO) <= 0) {
+            return BigDecimal.ZERO;
+        }
+        
+        long totalStayNights = ChronoUnit.DAYS.between(r.getCheckIn(), r.getCheckOut());
+        if (totalStayNights <= 0) {
+            return r.getTotalPrice();
+        }
+        
+        // Effective interval within queried period: [effectiveStart, effectiveEnd)
+        LocalDate effectiveStart = r.getCheckIn().isBefore(startDate) ? startDate : r.getCheckIn();
+        LocalDate effectiveEnd = r.getCheckOut().isAfter(endDate.plusDays(1)) ? endDate.plusDays(1) : r.getCheckOut();
+        
+        long nightsInPeriod = ChronoUnit.DAYS.between(effectiveStart, effectiveEnd);
+        if (nightsInPeriod <= 0) {
+            return BigDecimal.ZERO;
+        }
+        
+        if (nightsInPeriod >= totalStayNights) {
+            return r.getTotalPrice();
+        }
+        
+        BigDecimal nightlyRate = r.getTotalPrice().divide(BigDecimal.valueOf(totalStayNights), 4, RoundingMode.HALF_UP);
+        return nightlyRate.multiply(BigDecimal.valueOf(nightsInPeriod)).setScale(2, RoundingMode.HALF_UP);
     }
 
     private BigDecimal calculateEventRevenue(LocalDate startDate, LocalDate endDate) {
-        // Get all confirmed event bookings in the date range
-        // We'll use a simple approach by getting all bookings and filtering
-        // For now, return a placeholder until we have a proper method to get all event bookings
-        return BigDecimal.valueOf(25000.00);
+        // Push-down database query aggregating actual confirmed event booking revenue (INV-ANL-002)
+        LocalDateTime startDateTime = startDate.atStartOfDay();
+        LocalDateTime endDateTime = endDate.atTime(LocalTime.MAX);
+        return eventService.getTotalEventRevenueBetweenDates(startDateTime, endDateTime);
     }
 
     private long getTotalActiveCustomers() {
@@ -326,18 +385,20 @@ public class AnalyticsService {
     }
 
     private long calculateOccupiedRoomNights(LocalDate startDate, LocalDate endDate) {
-        // Calculate occupied room nights for confirmed reservations in the date range
-        List<Reservation> reservations = reservationService.getAllReservations().stream()
-            .filter(r -> r.getStatus() == ReservationStatus.CONFIRMED)
-            .filter(r -> !r.getCheckIn().isAfter(endDate) && !r.getCheckOut().isBefore(startDate))
-            .toList();
+        // Push-down database query fetching only reservations active in date range (INV-ANL-001)
+        List<Reservation> reservations = reservationService.getOverlappingReservationsInDateRange(
+            startDate, endDate, ReservationStatus.CONFIRMED);
         
-        return reservations.stream()
-            .mapToLong(r -> ChronoUnit.DAYS.between(
-                r.getCheckIn().isBefore(startDate) ? startDate : r.getCheckIn(),
-                r.getCheckOut().isAfter(endDate) ? endDate.plusDays(1) : r.getCheckOut()
-            ))
-            .sum();
+        long occupiedRoomNights = 0;
+        for (Reservation r : reservations) {
+            LocalDate effectiveStart = r.getCheckIn().isBefore(startDate) ? startDate : r.getCheckIn();
+            LocalDate effectiveEnd = r.getCheckOut().isAfter(endDate.plusDays(1)) ? endDate.plusDays(1) : r.getCheckOut();
+            long nights = ChronoUnit.DAYS.between(effectiveStart, effectiveEnd);
+            if (nights > 0) {
+                occupiedRoomNights += nights;
+            }
+        }
+        return occupiedRoomNights;
     }
 
     private long calculateDaysBetween(LocalDate startDate, LocalDate endDate) {

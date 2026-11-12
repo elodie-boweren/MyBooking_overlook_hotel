@@ -37,7 +37,10 @@ public class AnalyticsController {
             (java.math.BigDecimal) analytics.get("eventRevenue"),
             (java.math.BigDecimal) analytics.get("totalRevenue"),
             (Map<String, java.math.BigDecimal>) analytics.get("revenueByService"),
-            (java.math.BigDecimal) analytics.get("avgRevenuePerCustomer")
+            (java.math.BigDecimal) analytics.get("avgRevenuePerCustomer"),
+            (java.math.BigDecimal) analytics.get("adr"),
+            (java.math.BigDecimal) analytics.get("revPar"),
+            (Double) analytics.get("occupancyRate")
         );
         
         return ResponseEntity.ok(response);
@@ -72,7 +75,9 @@ public class AnalyticsController {
             (Long) metrics.get("totalRoomNights"),
             (Double) metrics.get("installationUtilizationRate"),
             (Long) metrics.get("usedInstallations"),
-            (Long) metrics.get("totalInstallations")
+            (Long) metrics.get("totalInstallations"),
+            (java.math.BigDecimal) metrics.get("adr"),
+            (java.math.BigDecimal) metrics.get("revPar")
         );
         
         return ResponseEntity.ok(response);

@@ -453,4 +453,26 @@ class EventBookingRepositoryTest {
         assertThat(cancelledRevenue).isPresent();
         assertThat(cancelledRevenue.get()).isEqualByComparingTo(new BigDecimal("150.00"));
     }
+
+    @Test
+    void testCalculateTotalRevenueBetweenDates() {
+        // Query January 2024: 150 (spa) + 800 (conference) + 25 (yoga) = 975.00 (excluding February expensiveBooking 800)
+        LocalDateTime janStart = LocalDateTime.of(2024, 1, 1, 0, 0);
+        LocalDateTime janEnd = LocalDateTime.of(2024, 1, 31, 23, 59, 59);
+
+        BigDecimal janRevenue = eventBookingRepository.calculateTotalRevenueBetweenDates(
+            janStart, janEnd, EventBookingStatus.CONFIRMED);
+        assertThat(janRevenue).isEqualByComparingTo(new BigDecimal("975.00"));
+
+        // Query Jan 1 to Feb 28 (including February expensiveBooking 800): 975 + 800 = 1775.00
+        LocalDateTime febEnd = LocalDateTime.of(2024, 2, 29, 23, 59, 59);
+        BigDecimal totalPeriodRevenue = eventBookingRepository.calculateTotalRevenueBetweenDates(
+            janStart, febEnd, EventBookingStatus.CONFIRMED);
+        assertThat(totalPeriodRevenue).isEqualByComparingTo(new BigDecimal("1775.00"));
+
+        // Date range in 2025 should yield 0
+        BigDecimal zeroRevenue = eventBookingRepository.calculateTotalRevenueBetweenDates(
+            LocalDateTime.of(2025, 1, 1, 0, 0), LocalDateTime.of(2025, 1, 31, 23, 59, 59), EventBookingStatus.CONFIRMED);
+        assertThat(zeroRevenue).isEqualByComparingTo(BigDecimal.ZERO);
+    }
 }

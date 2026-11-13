@@ -37,45 +37,41 @@ public class AdminReservationController {
             @RequestParam(required = false) String checkOutFrom,
             @RequestParam(required = false) String checkOutTo,
             Pageable pageable) {
-        try {
-            // Check if any filters are provided
-            boolean hasFilters = clientId != null || roomId != null || status != null || 
-                               checkInFrom != null || checkInTo != null || 
-                               checkOutFrom != null || checkOutTo != null;
-            
-            Page<ReservationResponseDto> reservations;
-            
-            if (hasFilters) {
-                // Use admin search method when filters are provided
-                ReservationSearchCriteriaDto criteria = new ReservationSearchCriteriaDto();
-                criteria.setClientId(clientId);
-                criteria.setRoomId(roomId);
-                if (status != null) {
-                    criteria.setStatus(com.MyBooking.reservation.domain.ReservationStatus.valueOf(status));
-                }
-                if (checkInFrom != null) {
-                    criteria.setCheckInFrom(java.time.LocalDate.parse(checkInFrom));
-                }
-                if (checkInTo != null) {
-                    criteria.setCheckInTo(java.time.LocalDate.parse(checkInTo));
-                }
-                if (checkOutFrom != null) {
-                    criteria.setCheckOutFrom(java.time.LocalDate.parse(checkOutFrom));
-                }
-                if (checkOutTo != null) {
-                    criteria.setCheckOutTo(java.time.LocalDate.parse(checkOutTo));
-                }
-                
-                reservations = reservationService.searchAllReservationsAsDto(criteria, pageable);
-            } else {
-                // Use getAllReservationsAsDto when no filters are provided
-                reservations = reservationService.getAllReservationsAsDto(pageable);
+        // Check if any filters are provided
+        boolean hasFilters = clientId != null || roomId != null || status != null ||
+                           checkInFrom != null || checkInTo != null ||
+                           checkOutFrom != null || checkOutTo != null;
+
+        Page<ReservationResponseDto> reservations;
+
+        if (hasFilters) {
+            // Use admin search method when filters are provided
+            ReservationSearchCriteriaDto criteria = new ReservationSearchCriteriaDto();
+            criteria.setClientId(clientId);
+            criteria.setRoomId(roomId);
+            if (status != null) {
+                criteria.setStatus(com.MyBooking.reservation.domain.ReservationStatus.valueOf(status));
             }
-            
-            return ResponseEntity.ok(reservations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            if (checkInFrom != null) {
+                criteria.setCheckInFrom(java.time.LocalDate.parse(checkInFrom));
+            }
+            if (checkInTo != null) {
+                criteria.setCheckInTo(java.time.LocalDate.parse(checkInTo));
+            }
+            if (checkOutFrom != null) {
+                criteria.setCheckOutFrom(java.time.LocalDate.parse(checkOutFrom));
+            }
+            if (checkOutTo != null) {
+                criteria.setCheckOutTo(java.time.LocalDate.parse(checkOutTo));
+            }
+
+            reservations = reservationService.searchAllReservationsAsDto(criteria, pageable);
+        } else {
+            // Use getAllReservationsAsDto when no filters are provided
+            reservations = reservationService.getAllReservationsAsDto(pageable);
         }
+
+        return ResponseEntity.ok(reservations);
     }
 
     /**
@@ -85,14 +81,8 @@ public class AdminReservationController {
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ReservationResponseDto> getReservation(@PathVariable Long id) {
-        try {
-            ReservationResponseDto reservation = reservationService.getReservationByIdAsDto(id);
-            return ResponseEntity.ok(reservation);
-        } catch (com.MyBooking.common.exception.NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        ReservationResponseDto reservation = reservationService.getReservationByIdAsDto(id);
+        return ResponseEntity.ok(reservation);
     }
 
     /**
@@ -104,16 +94,8 @@ public class AdminReservationController {
     public ResponseEntity<ReservationResponseDto> updateReservation(
             @PathVariable Long id,
             @Valid @RequestBody ReservationUpdateRequestDto request) {
-        try {
-            ReservationResponseDto updatedReservation = reservationService.updateReservation(id, request);
-            return ResponseEntity.ok(updatedReservation);
-        } catch (com.MyBooking.common.exception.NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (com.MyBooking.common.exception.BusinessRuleException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        ReservationResponseDto updatedReservation = reservationService.updateReservation(id, request);
+        return ResponseEntity.ok(updatedReservation);
     }
 
     /**
@@ -123,16 +105,8 @@ public class AdminReservationController {
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> cancelReservation(@PathVariable Long id) {
-        try {
-            reservationService.cancelReservation(id);
-            return ResponseEntity.noContent().build();
-        } catch (com.MyBooking.common.exception.NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (com.MyBooking.common.exception.BusinessRuleException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        reservationService.cancelReservation(id);
+        return ResponseEntity.noContent().build();
     }
 
     /**
@@ -144,16 +118,8 @@ public class AdminReservationController {
     public ResponseEntity<ReservationResponseDto> reassignReservation(
             @PathVariable Long id,
             @RequestParam Long newRoomId) {
-        try {
-            ReservationResponseDto updatedReservation = reservationService.reassignReservation(id, newRoomId);
-            return ResponseEntity.ok(updatedReservation);
-        } catch (com.MyBooking.common.exception.NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (com.MyBooking.common.exception.BusinessRuleException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        ReservationResponseDto updatedReservation = reservationService.reassignReservation(id, newRoomId);
+        return ResponseEntity.ok(updatedReservation);
     }
 
     /**
@@ -165,12 +131,8 @@ public class AdminReservationController {
     public ResponseEntity<Page<ReservationResponseDto>> getReservationsByClient(
             @PathVariable Long clientId,
             Pageable pageable) {
-        try {
-            Page<ReservationResponseDto> reservations = reservationService.getReservationsByClientId(clientId, pageable);
-            return ResponseEntity.ok(reservations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Page<ReservationResponseDto> reservations = reservationService.getReservationsByClientId(clientId, pageable);
+        return ResponseEntity.ok(reservations);
     }
 
     /**
@@ -182,11 +144,7 @@ public class AdminReservationController {
     public ResponseEntity<Page<ReservationResponseDto>> getReservationsByRoom(
             @PathVariable Long roomId,
             Pageable pageable) {
-        try {
-            Page<ReservationResponseDto> reservations = reservationService.getReservationsByRoomId(roomId, pageable);
-            return ResponseEntity.ok(reservations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Page<ReservationResponseDto> reservations = reservationService.getReservationsByRoomId(roomId, pageable);
+        return ResponseEntity.ok(reservations);
     }
 }

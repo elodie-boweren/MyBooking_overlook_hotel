@@ -51,13 +51,9 @@ public class AuthController {
      * User registration 
      */
     @PostMapping("/register")
-    public ResponseEntity<User> register(@RequestBody User user) {
+    public ResponseEntity<User> register(@Valid @RequestBody User user) {
         try {
-            // Set default role for new users if not provided
-            if (user.getRole() == null) {
-                user.setRole(Role.CLIENT);
-            }
-            
+            // Self-registration is strictly restricted to CLIENT role regardless of request payload
             User registeredUser = authService.registerUser(
                 user.getEmail(),
                 user.getPassword(),
@@ -66,7 +62,7 @@ public class AuthController {
                 user.getPhone(),
                 user.getAddress(),
                 user.getBirthDate(),
-                user.getRole()
+                Role.CLIENT
             );
             return ResponseEntity.status(HttpStatus.CREATED).body(registeredUser);
         } catch (BusinessRuleException e) {
@@ -178,6 +174,7 @@ public class AuthController {
      * Reset password 
      */
     @PutMapping("/reset-password")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> resetPassword(
             @RequestParam String email,
             @RequestParam String newPassword) {

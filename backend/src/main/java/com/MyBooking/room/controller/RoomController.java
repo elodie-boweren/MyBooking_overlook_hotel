@@ -45,29 +45,24 @@ public class RoomController {
             @RequestParam(required = false) LocalDate checkIn,
             @RequestParam(required = false) LocalDate checkOut,
             Pageable pageable) {
-        
-        try {
-            Page<Room> rooms;
-            
-            // If dates are provided, get available rooms for date range WITH PROPER PAGINATION
-            if (checkIn != null && checkOut != null) {
-                if (roomType != null || minCapacity != null) {
-                    // Use filtered availability search with pagination
-                    rooms = roomService.getAvailableRoomsForDateRangeWithFilters(
-                        checkIn, checkOut, roomType, minCapacity, pageable);
-                } else {
-                    // Use basic availability search with pagination
-                    rooms = roomService.getAvailableRoomsForDateRange(checkIn, checkOut, pageable);
-                }
+        Page<Room> rooms;
+
+        // If dates are provided, get available rooms for date range WITH PROPER PAGINATION
+        if (checkIn != null && checkOut != null) {
+            if (roomType != null || minCapacity != null) {
+                // Use filtered availability search with pagination
+                rooms = roomService.getAvailableRoomsForDateRangeWithFilters(
+                    checkIn, checkOut, roomType, minCapacity, pageable);
             } else {
-                // Use criteria-based filtering with pagination
-                rooms = roomService.getRoomsByCriteria(roomType, minCapacity, maxPrice, status, pageable);
+                // Use basic availability search with pagination
+                rooms = roomService.getAvailableRoomsForDateRange(checkIn, checkOut, pageable);
             }
-            
-            return ResponseEntity.ok(rooms);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        } else {
+            // Use criteria-based filtering with pagination
+            rooms = roomService.getRoomsByCriteria(roomType, minCapacity, maxPrice, status, pageable);
         }
+
+        return ResponseEntity.ok(rooms);
     }
 
     /**
@@ -76,14 +71,8 @@ public class RoomController {
     @GetMapping("/{roomId}")
     @PreAuthorize("hasAnyRole('CLIENT', 'ADMIN')")
     public ResponseEntity<Room> getRoomById(@PathVariable Long roomId) {
-        try {
-            Room room = roomService.getRoomById(roomId);
-            return ResponseEntity.ok(room);
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Room room = roomService.getRoomById(roomId);
+        return ResponseEntity.ok(room);
     }
 
     /**
@@ -95,21 +84,14 @@ public class RoomController {
             @PathVariable Long roomId,
             @RequestParam(required = false) LocalDate checkIn,
             @RequestParam(required = false) LocalDate checkOut) {
-        
-        try {
-            Room room = roomService.getRoomById(roomId);
-            
-            if (checkIn != null && checkOut != null) {
-                boolean isAvailable = roomService.isRoomAvailable(roomId, checkIn, checkOut);
-                return ResponseEntity.ok(new AvailabilityResponse(roomId, isAvailable, checkIn, checkOut));
-            } else {
-                String status = roomService.getRoomAvailabilityStatus(roomId);
-                return ResponseEntity.ok(new AvailabilityResponse(roomId, status));
-            }
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        roomService.getRoomById(roomId);
+
+        if (checkIn != null && checkOut != null) {
+            boolean isAvailable = roomService.isRoomAvailable(roomId, checkIn, checkOut);
+            return ResponseEntity.ok(new AvailabilityResponse(roomId, isAvailable, checkIn, checkOut));
+        } else {
+            String status = roomService.getRoomAvailabilityStatus(roomId);
+            return ResponseEntity.ok(new AvailabilityResponse(roomId, status));
         }
     }
 
@@ -121,23 +103,15 @@ public class RoomController {
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Room> createRoom(@Valid @RequestBody RoomCreateRequestDto roomRequest) {
-        try {
-            Room createdRoom = roomService.createRoom(
-                roomRequest.getNumber(),
-                roomRequest.getRoomType(),
-                roomRequest.getPrice(),
-                roomRequest.getCurrency(),
-                roomRequest.getCapacity(),
-                roomRequest.getDescription()
-            );
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdRoom);
-        } catch (BusinessRuleException e) {
-            e.printStackTrace(); // Log the error for debugging
-            throw e; // Let GlobalExceptionHandler handle it with proper error message
-        } catch (Exception e) {
-            e.printStackTrace(); // Log the error for debugging
-            throw e; // Let GlobalExceptionHandler handle it
-        }
+        Room createdRoom = roomService.createRoom(
+            roomRequest.getNumber(),
+            roomRequest.getRoomType(),
+            roomRequest.getPrice(),
+            roomRequest.getCurrency(),
+            roomRequest.getCapacity(),
+            roomRequest.getDescription()
+        );
+        return ResponseEntity.status(HttpStatus.CREATED).body(createdRoom);
     }
 
     /**
@@ -146,25 +120,17 @@ public class RoomController {
     @PutMapping("/{roomId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Room> updateRoom(@PathVariable Long roomId, @Valid @RequestBody Room room) {
-        try {
-            Room updatedRoom = roomService.updateRoom(
-                roomId,
-                room.getNumber(),
-                room.getRoomType(),
-                room.getPrice(),
-                room.getCurrency(),
-                room.getCapacity(),
-                room.getDescription(),
-                room.getStatus()
-            );
-            return ResponseEntity.ok(updatedRoom);
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (BusinessRuleException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Room updatedRoom = roomService.updateRoom(
+            roomId,
+            room.getNumber(),
+            room.getRoomType(),
+            room.getPrice(),
+            room.getCurrency(),
+            room.getCapacity(),
+            room.getDescription(),
+            room.getStatus()
+        );
+        return ResponseEntity.ok(updatedRoom);
     }
 
     /**
@@ -173,14 +139,8 @@ public class RoomController {
     @DeleteMapping("/{roomId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Void> deleteRoom(@PathVariable Long roomId) {
-        try {
-            roomService.deleteRoom(roomId);
-            return ResponseEntity.noContent().build();
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        roomService.deleteRoom(roomId);
+        return ResponseEntity.noContent().build();
     }
 
     // ========== EMPLOYEE ENDPOINTS ==========
@@ -195,31 +155,24 @@ public class RoomController {
             @RequestParam(required = false) RoomStatus status,
             @RequestParam(required = false) RoomType roomType,
             Pageable pageable) {
-        
-        try {
-            Page<Room> rooms;
-            
-            if (number != null && !number.trim().isEmpty()) {
-                // Search by room number - return single room as page
-                Room room = roomService.getRoomByNumber(number);
-                rooms = new PageImpl<>(List.of(room), pageable, 1);
-            } else if (status != null) {
-                // Search by status with pagination
-                rooms = roomService.getRoomsByStatus(status, pageable);
-            } else if (roomType != null) {
-                // Search by room type with pagination
-                rooms = roomService.getRoomsByType(roomType, pageable);
-            } else {
-                // Return all rooms with pagination
-                rooms = roomService.getAllRooms(pageable);
-            }
-            
-            return ResponseEntity.ok(rooms);
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        Page<Room> rooms;
+
+        if (number != null && !number.trim().isEmpty()) {
+            // Search by room number - return single room as page
+            Room room = roomService.getRoomByNumber(number);
+            rooms = new PageImpl<>(List.of(room), pageable, 1);
+        } else if (status != null) {
+            // Search by status with pagination
+            rooms = roomService.getRoomsByStatus(status, pageable);
+        } else if (roomType != null) {
+            // Search by room type with pagination
+            rooms = roomService.getRoomsByType(roomType, pageable);
+        } else {
+            // Return all rooms with pagination
+            rooms = roomService.getAllRooms(pageable);
         }
+
+        return ResponseEntity.ok(rooms);
     }
 
     /**
@@ -229,27 +182,18 @@ public class RoomController {
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<Room> updateRoomStatus(
             @PathVariable Long roomId,
-            @RequestBody RoomStatusUpdateRequest request,
+            @Valid @RequestBody RoomStatusUpdateRequest request,
             @AuthenticationPrincipal UserPrincipal principal) {
-        
-        try {
-            User user = roomService.getUserByUsername(principal.getEmail());
-            
-            // Use the simpler updateRoomStatus method without notes and reason
-            Room updatedRoom = roomService.updateRoomStatus(
-                roomId,
-                request.getNewStatus(),
-                user
-            );
-            
-            return ResponseEntity.ok(updatedRoom);
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (BusinessRuleException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        User user = roomService.getUserByUsername(principal.getEmail());
+
+        // Use the simpler updateRoomStatus method without notes and reason
+        Room updatedRoom = roomService.updateRoomStatus(
+            roomId,
+            request.getNewStatus(),
+            user
+        );
+
+        return ResponseEntity.ok(updatedRoom);
     }
 
     // ========== INNER CLASSES ==========
@@ -287,6 +231,7 @@ public class RoomController {
     }
 
     public static class RoomStatusUpdateRequest {
+        @jakarta.validation.constraints.NotNull(message = "New status is required")
         private RoomStatus newStatus;
         private String notes;
         private String updateReason;

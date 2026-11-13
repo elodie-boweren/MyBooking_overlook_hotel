@@ -36,31 +36,27 @@ public class EmployeeReservationController {
             @RequestParam(required = false) String checkOutFrom,
             @RequestParam(required = false) String checkOutTo,
             Pageable pageable) {
-        try {
-            ReservationSearchCriteriaDto criteria = new ReservationSearchCriteriaDto();
-            criteria.setClientId(clientId);
-            criteria.setRoomId(roomId);
-            if (status != null) {
-                criteria.setStatus(com.MyBooking.reservation.domain.ReservationStatus.valueOf(status));
-            }
-            if (checkInFrom != null) {
-                criteria.setCheckInFrom(java.time.LocalDate.parse(checkInFrom));
-            }
-            if (checkInTo != null) {
-                criteria.setCheckInTo(java.time.LocalDate.parse(checkInTo));
-            }
-            if (checkOutFrom != null) {
-                criteria.setCheckOutFrom(java.time.LocalDate.parse(checkOutFrom));
-            }
-            if (checkOutTo != null) {
-                criteria.setCheckOutTo(java.time.LocalDate.parse(checkOutTo));
-            }
-            
-            Page<ReservationResponseDto> reservations = reservationService.searchReservationsAsDto(criteria, pageable);
-            return ResponseEntity.ok(reservations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        ReservationSearchCriteriaDto criteria = new ReservationSearchCriteriaDto();
+        criteria.setClientId(clientId);
+        criteria.setRoomId(roomId);
+        if (status != null) {
+            criteria.setStatus(com.MyBooking.reservation.domain.ReservationStatus.valueOf(status));
         }
+        if (checkInFrom != null) {
+            criteria.setCheckInFrom(java.time.LocalDate.parse(checkInFrom));
+        }
+        if (checkInTo != null) {
+            criteria.setCheckInTo(java.time.LocalDate.parse(checkInTo));
+        }
+        if (checkOutFrom != null) {
+            criteria.setCheckOutFrom(java.time.LocalDate.parse(checkOutFrom));
+        }
+        if (checkOutTo != null) {
+            criteria.setCheckOutTo(java.time.LocalDate.parse(checkOutTo));
+        }
+
+        Page<ReservationResponseDto> reservations = reservationService.searchReservationsAsDto(criteria, pageable);
+        return ResponseEntity.ok(reservations);
     }
 
     /**
@@ -70,14 +66,8 @@ public class EmployeeReservationController {
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<ReservationResponseDto> getReservation(@PathVariable Long id) {
-        try {
-            ReservationResponseDto reservation = reservationService.getReservationByIdAsDto(id);
-            return ResponseEntity.ok(reservation);
-        } catch (com.MyBooking.common.exception.NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        ReservationResponseDto reservation = reservationService.getReservationByIdAsDto(id);
+        return ResponseEntity.ok(reservation);
     }
 
     /**
@@ -89,12 +79,8 @@ public class EmployeeReservationController {
     public ResponseEntity<Page<ReservationResponseDto>> getReservationsByClient(
             @PathVariable Long clientId,
             Pageable pageable) {
-        try {
-            Page<ReservationResponseDto> reservations = reservationService.getReservationsByClientId(clientId, pageable);
-            return ResponseEntity.ok(reservations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Page<ReservationResponseDto> reservations = reservationService.getReservationsByClientId(clientId, pageable);
+        return ResponseEntity.ok(reservations);
     }
 
     /**
@@ -106,12 +92,8 @@ public class EmployeeReservationController {
     public ResponseEntity<Page<ReservationResponseDto>> getReservationsByRoom(
             @PathVariable Long roomId,
             Pageable pageable) {
-        try {
-            Page<ReservationResponseDto> reservations = reservationService.getReservationsByRoomId(roomId, pageable);
-            return ResponseEntity.ok(reservations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Page<ReservationResponseDto> reservations = reservationService.getReservationsByRoomId(roomId, pageable);
+        return ResponseEntity.ok(reservations);
     }
 
     /**
@@ -123,16 +105,10 @@ public class EmployeeReservationController {
     public ResponseEntity<Page<ReservationResponseDto>> getReservationsByStatus(
             @PathVariable String status,
             Pageable pageable) {
-        try {
-            com.MyBooking.reservation.domain.ReservationStatus reservationStatus = 
-                com.MyBooking.reservation.domain.ReservationStatus.valueOf(status);
-            Page<ReservationResponseDto> reservations = reservationService.getReservationsByStatus(reservationStatus, pageable);
-            return ResponseEntity.ok(reservations);
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        com.MyBooking.reservation.domain.ReservationStatus reservationStatus =
+            com.MyBooking.reservation.domain.ReservationStatus.valueOf(status);
+        Page<ReservationResponseDto> reservations = reservationService.getReservationsByStatus(reservationStatus, pageable);
+        return ResponseEntity.ok(reservations);
     }
 
     /**
@@ -145,13 +121,9 @@ public class EmployeeReservationController {
             @RequestParam String startDate,
             @RequestParam String endDate,
             Pageable pageable) {
-        try {
-            java.time.LocalDate start = java.time.LocalDate.parse(startDate);
-            java.time.LocalDate end = java.time.LocalDate.parse(endDate);
-            Page<ReservationResponseDto> reservations = reservationService.getReservationsByDateRange(start, end, pageable);
-            return ResponseEntity.ok(reservations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        java.time.LocalDate start = java.time.LocalDate.parse(startDate);
+        java.time.LocalDate end = java.time.LocalDate.parse(endDate);
+        Page<ReservationResponseDto> reservations = reservationService.getReservationsByDateRange(start, end, pageable);
+        return ResponseEntity.ok(reservations);
     }
 }

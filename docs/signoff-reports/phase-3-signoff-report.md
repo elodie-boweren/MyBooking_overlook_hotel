@@ -4,8 +4,8 @@
 - **Phase**: Phase 03 — Domain Refactoring & Reservation Core Fixes
 - **Feature Branch**: `feature/phase-3-domain-refactoring`
 - **Execution Date**: November 2026
-- **Status**: **COMPLETE & FULLY VERIFIED (P3-T01 through P3-T09 & P3-T06 Capstone Verified)**
-- **Test Suite Status**: **1,180 / 1,180 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
+- **Status**: **COMPLETE & FULLY VERIFIED (P3-T01 through P3-T12 Verified)**
+- **Test Suite Status**: **1,213 / 1,213 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
 - **Authoritative Invariants**: `INV-RES-001`, `INV-RES-002`, `INV-RES-003`, `INV-ROOM-001`, `INV-EVT-001`, `INV-EVT-002`, `INV-EVT-003`, `INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`, `INV-EMP-001`, `INV-EMP-002`, `INV-ANL-001`, `INV-ANL-002`, `INV-ANN-001` (documented in `docs/architecture/domain-invariants.md`)
 
 ---
@@ -30,8 +30,12 @@
 5. [Source Code Implementations of Key Components](#5-source-code-implementations-of-key-components)
 6. [Complete Test Harness & Verification Suite](#6-complete-test-harness--verification-suite)
 7. [Test Execution Results & Performance Metrics](#7-test-execution-results--performance-metrics)
-8. [Evolution Path to Milestone IdP & Phase 4](#8-evolution-path-to-milestone-idp--phase-4)
-9. [Formal Sign-off & Architectural Acceptance](#9-formal-sign-off--architectural-acceptance)
+8. [Additional Phase 3 Deep Verifications (`P3-T10`, `P3-T11`, `P3-T12`)](#8-additional-phase-3-deep-verifications-p3-t10-p3-t11-p3-t12)
+   - [8.1 `P3-T10`: Real Database Concurrency & Pessimistic Locking Verification](#81-p3-t10-real-database-concurrency--pessimistic-locking-verification-postgresql-testcontainers)
+   - [8.2 `P3-T11`: Runtime SQL Query Count & N+1 Verification](#82-p3-t11-runtime-sql-query-count--n1-verification-hibernategenerate_statistics)
+   - [8.3 `P3-T12`: Controller & Security Layer Alignment Audit & Hardening](#83-p3-t12-controller--security-layer-alignment-audit--hardening)
+9. [Evolution Path to Milestone IdP & Phase 4](#9-evolution-path-to-milestone-idp--phase-4)
+10. [Formal Sign-off & Architectural Acceptance](#10-formal-sign-off--architectural-acceptance)
 
 ---
 
@@ -255,36 +259,36 @@ While `@Version` serves as the optimal primary concurrency mechanism for normal 
   2. *Hardcoded Event Revenue (`AUD-ANL-002`, `INV-ANL-002`)*: `calculateEventRevenue` returned a hardcoded dummy placeholder `return BigDecimal.valueOf(25000.00)`.
   3. *Cross-Month Revenue Double Counting (`INV-ANL-002`)*: Overlapping reservations had their full `totalPrice` counted in every month they touched.
   4. *Deprecated BigDecimal Division*: Used deprecated integer constant `BigDecimal.ROUND_HALF_UP` instead of `RoundingMode.HALF_UP`.
-- **Solution Plan**:
-  - Implement push-down JPQL aggregation queries in `ReservationRepository` (`SELECT COALESCE(SUM(r.totalPrice), 0)...`) and `EventBookingRepository`.
-  - Prorate multi-month reservations nightly across requested date bounds to eliminate double counting.
-  - Replace dummy event revenue with real confirmed bookings aggregation.
-  - Formally implement USALI metrics: Average Daily Rate (ADR), Revenue Per Available Room (RevPAR), and Occupancy Rate %.
+- **Solution Implemented**:
+  - Implemented push-down JPQL aggregation queries in `ReservationRepository` (`SELECT COALESCE(SUM(r.totalPrice), 0)...`) and `EventBookingRepository`.
+  - Prorated multi-month reservations nightly across requested date bounds to eliminate double counting.
+  - Replaced dummy event revenue with real confirmed bookings aggregation.
+  - Formally implemented USALI metrics: Average Daily Rate (ADR), Revenue Per Available Room (RevPAR), and Occupancy Rate %.
 
 ### P3-T08: Department Domain Model & Announcement REST API with Audience Scoping
 - **Problem**:
   1. *Orphan Backend Module (`AUD-ANN-001`)*: `com.MyBooking.announcement` contained domain entities and service logic, but `controller/` and `dto/` were empty `.gitkeep` files. The module was unreachable by any API client.
   2. *Missing Department Concept (`AUD-ANN-002`)*: `Employee` had only a free-text `jobTitle` without an operational department enum. Announcements had no audience targeting.
-- **Solution Plan**:
-  - Introduce `Department` enum (`ALL`, `FRONT_DESK`, `HOUSEKEEPING`, `MAINTENANCE`, `FOOD_AND_BEVERAGE`, `MANAGEMENT`, `SECURITY`) and assign it to `Employee`.
-  - Add `targetDepartment` and `targetRole` to `Announcement` domain entity.
-  - Create full suite of DTOs (`AnnouncementResponseDto`, `AnnouncementCreateRequestDto`, `AnnouncementReplyRequestDto`).
-  - Implement secured `AnnouncementController` (`/api/announcements`) with role/department filtering and acknowledgment capabilities.
+- **Solution Implemented**:
+  - Introduced `Department` enum (`ALL`, `FRONT_DESK`, `HOUSEKEEPING`, `MAINTENANCE`, `FOOD_AND_BEVERAGE`, `MANAGEMENT`, `SECURITY`) and assigned it to `Employee`.
+  - Added `targetDepartment` and `targetRole` to `Announcement` domain entity.
+  - Created full suite of DTOs (`AnnouncementResponseDto`, `AnnouncementCreateRequestDto`, `AnnouncementReplyRequestDto`).
+  - Implemented secured `AnnouncementController` (`/api/announcements`) with role/department filtering and acknowledgment capabilities.
 
 ### P3-T09: Installation Availability Query Hardening & Event Update Self-Exclusion
 - **Problem**:
   1. *Global Unfiltered Availability Scan (`AUD-EVT-003`, `INV-EVT-003`)*: `EventRepository.checkEventAvailability(startTime, endTime)` queried every event across all installations in the hotel, forcing `InstallationService.isInstallationAvailable` to filter by `installationId` in JVM memory.
   2. *Event Update Self-Collision*: Updating an existing event collided with its own persisted database row because no `:excludeEventId` exemption existed.
-- **Solution Plan**:
-  - Rewrite `EventRepository` availability query to filter directly by `e.installation.id = :installationId` using canonical half-open interval math (`e.startAt < :endTime AND e.endAt > :startTime`) with optional `:excludeEventId` exemption.
-  - Remove in-memory stream filtering from `InstallationService.isInstallationAvailable` and wire self-exclusion into `EventService` updates.
+- **Solution Implemented**:
+  - Rewrote `EventRepository` availability query to filter directly by `e.installation.id = :installationId` using canonical half-open interval math (`e.startAt < :endTime AND e.endAt > :startTime`) with optional `:excludeEventId` exemption.
+  - Removed in-memory stream filtering from `InstallationService.isInstallationAvailable` and wired self-exclusion into `EventService` updates.
 
 ### P3-T06: Concurrency Stress Test Suite & Business Invariant Regression Harness
 - **Problem**:
-  - Need a dedicated, multi-threaded stress harness validating that all Phase 3 concurrency fixes (pessimistic row locking on events, optimistic locking on loyalty points, room interval collisions, shift non-overlap, and analytics push-down queries) hold under high parallel load with zero race conditions or deadlocks.
-- **Solution Plan**:
-  - Multi-threaded stress tests simulating parallel bookings, simultaneous loyalty redemptions, concurrent shift scheduling, and rapid reporting queries.
-  - Automated verification of zero lost updates and zero capacity overruns.
+  - Needed a dedicated, multi-threaded stress harness validating that all Phase 3 concurrency fixes (pessimistic row locking on events, rooms, loyalty accounts, and employee shifts, plus analytics push-down queries) hold under parallel load with zero race conditions or deadlocks.
+- **Solution Implemented**:
+  - Built multi-threaded stress tests (`Phase3ConcurrencyStressTest`) simulating parallel bookings, simultaneous loyalty redemptions, and concurrent shift scheduling.
+  - Added `QueryPerformanceBenchmarkTest` (`50 × 500`) and verified zero lost updates and zero capacity overruns.
 
 ---
 
@@ -434,6 +438,11 @@ The domain fixes are validated through unit, repository, and integration test su
 - **`LoyaltyTransactionTest` & `LoyaltyAccountTest`**: Verifies 4 transaction types (`EARN`, `REDEEM`, `REFUND`, `CLAWBACK`), descriptions, and `@Version` optimistic concurrency properties.
 - **`EmployeeServiceTest` & `ShiftRepositoryTest`**: Verifies `INV-EMP-001` task rejection during approved leave, shift update exclusion queries, and date-bounded training availability.
 - **`FeedbackServiceTest`**: Verifies rejection of reviews submitted on cancelled reservations (`AUD-FDBK-001`).
+- **`AnalyticsServiceTest`**: Verifies USALI ADR, RevPAR, occupancy rate, prorated multi-month room revenue, and push-down aggregations (`INV-ANL-001`, `INV-ANL-002`).
+- **`AnnouncementServiceTest` & `AnnouncementControllerTest`**: Verifies department/role audience scoping and reply/acknowledgment endpoints (`INV-ANN-001`).
+- **`InstallationServiceTest` & `EventRepositoryTest`**: Verifies installation availability push-down queries and event update self-exclusion (`INV-EVT-003`).
+- **`Phase3ConcurrencyStressTest` & `QueryPerformanceBenchmarkTest`**: Verifies multi-threaded locking invariants (`INV-EVT-001`, `INV-RES-001`, `INV-LOY-001`, `INV-EMP-002`) and `50 × 500` query benchmarks (`P3-T06`).
+- **`Phase3AuditConcurrencyTest`, `Phase3QueryPerformanceTest`, & `Phase3ControllerSecurityAlignmentTest`**: Verify real PostgreSQL 16 Testcontainers locking (`P3-T10`), Hibernate `generate_statistics` SQL counts (`P3-T11`), and MockMvc controller/security/exception alignment (`P3-T12`).
 
 ---
 
@@ -453,25 +462,95 @@ Full Maven test suite execution across all modules (`./mvnw test`):
 [INFO] Tests run: 29, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 4.741 s -- in com.MyBooking.employee.repository.ShiftRepositoryTest
 [INFO] Running com.MyBooking.loyalty.service.LoyaltyServiceTest
 [INFO] Tests run: 35, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.605 s -- in com.MyBooking.loyalty.service.LoyaltyServiceTest
+[INFO] Running com.MyBooking.concurrency.Phase3AuditConcurrencyTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.MyBooking.performance.Phase3QueryPerformanceTest
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.MyBooking.common.security.Phase3ControllerSecurityAlignmentTest
+[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
 [INFO] ...
 [INFO] Results:
 [INFO] 
-[INFO] Tests run: 1160, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Tests run: 1213, Failures: 0, Errors: 0, Skipped: 0
 [INFO] 
 [INFO] ------------------------------------------------------------------------
 [INFO] BUILD SUCCESS
 [INFO] ------------------------------------------------------------------------
 ```
 
-- **Total Test Count**: **1,160 tests**
-- **Pass Rate**: **100% (1,160 passed, 0 failed, 0 errors, 0 skipped)**
-- **Regression Check**: Zero regressions across security, inventory, booking, employee scheduling, feedback, and loyalty modules.
+- **Total Test Count**: **1,213 tests**
+- **Pass Rate**: **100% (1,213 passed, 0 failed, 0 errors, 0 skipped)**
+- **Regression Check**: Zero regressions across security, inventory, booking, employee scheduling, feedback, loyalty, PostgreSQL concurrency, query statistics, and controller security alignment modules.
 
 ---
 
-## 8. Evolution Path to Milestone IdP & Phase 4
+## 8. Additional Phase 3 Deep Verifications (`P3-T10`, `P3-T11`, `P3-T12`)
 
-Upon completion of tickets `P3-T01` through `P3-T09`, the full Phase 3 domain refactoring roadmap is certified:
+Before closing Phase 3, three additional verification tickets were executed to validate real database locking, runtime SQL query counts, and controller/security layer alignment.
+
+### 8.1 `P3-T10`: Real Database Concurrency & Pessimistic Locking Verification (PostgreSQL Testcontainers)
+
+- **Description**: Multi-threaded integration test suite (`Phase3AuditConcurrencyTest`) executing concurrent reservation, event booking, loyalty redemption, and employee shift assignment workloads against a real **PostgreSQL 16 (`postgres:16-alpine`)** container managed by Testcontainers (`@Testcontainers(disabledWithoutDocker = true)`).
+- **Goal**: Verify that JPA `PESSIMISTIC_WRITE` (`SELECT ... FOR UPDATE`), `READ_COMMITTED` transaction semantics, and PostgreSQL unique constraints (`room_number_key`) hold under real database row-locking behavior rather than H2 in-memory emulation.
+- **Scope & Limits**:
+  - Covers concurrent overlapping room reservations, concurrent event capacity booking, concurrent loyalty point redemptions, and concurrent overlapping employee shift assignments.
+  - PostgreSQL container port `5432` is mapped to an ephemeral random host port (never binding host `5432`).
+  - `src/test/resources/docker-java.properties` sets `api.version=1.44` for Docker Desktop compatibility.
+  - Executed with `ddl-auto: create-drop` (`flyway.enabled: false` in test profile); production Flyway DDL compatibility is covered separately by migration scripts.
+- **Observed Results**:
+  - **5 / 5 tests passed** (`Tests run: 5, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`).
+  - Real PostgreSQL `PESSIMISTIC_WRITE` locks and unique constraints (`room_number_key`) serialized conflicting writes with zero deadlocks, zero overbookings, and zero lost updates.
+
+### 8.2 `P3-T11`: Runtime SQL Query Count & N+1 Verification (`hibernate.generate_statistics`)
+
+- **Description**: Runtime SQL instrumentation test (`Phase3QueryPerformanceTest`) enabling Hibernate statistics (`spring.jpa.properties.hibernate.generate_statistics=true`, `SessionFactory.getStatistics()`) across paginated DTO endpoints and analytics dashboard aggregation with `N = 10` seeded records per entity type.
+- **Goal**: Prove empirically at runtime that refactored Phase 3 service methods and DTO mappers execute bounded `O(1)` SQL statements per call without N+1 lazy-loading regressions.
+- **Scope & Limits**:
+  - Measures `getStatistics().getPrepareStatementCount()` on H2 in `test` profile for `N = 10` records across 8 paginated DTO endpoints plus the analytics dashboard aggregation.
+  - Counts SQL statements prepared per service invocation; network latency and large-table PostgreSQL query plans are not benchmarked here (see `QueryPerformanceBenchmarkTest` in Section 9 / `P3-T06` for `50 × 500` scaling).
+- **Observed Results**:
+  - **1 / 1 test passed** (`Tests run: 1, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`).
+  - Exact observed statement counts (`N = 10`):
+    - `feedback`: **3 SQL**
+    - `announcement`: **2 SQL**
+    - `visibleAnn` (visible announcements): **4 SQL**
+    - `reservation`: **2 SQL**
+    - `event`: **2 SQL**
+    - `eventBooking`: **2 SQL**
+    - `loyaltyAcc` (loyalty accounts): **2 SQL**
+    - `loyaltyTx` (loyalty transactions): **3 SQL**
+    - `dashboard` (full analytics dashboard across 9 services): **36 SQL** (`O(1)` aggregate queries, zero N+1 loops).
+
+### 8.3 `P3-T12`: Controller & Security Layer Alignment Audit & Hardening
+
+- **Description**: Systematic audit of all 18 `*Controller.java` classes, `SecurityConfig.java`, `application.yml`, and `application-dev.yml`, paired with fixes for discovered HIGH/MEDIUM gaps and MockMvc verification (`Phase3ControllerSecurityAlignmentTest`).
+- **Goal**: Ensure HTTP-layer authorization (`@PreAuthorize`, ownership checks), Bean Validation (`@Valid`), privilege-escalation guards, and JPA session boundaries (`open-in-view: false`) match the hardened Phase 3 service layer.
+- **Fixes Applied**:
+  1. **`AuthController.resetPassword` (HIGH)**: Added `@PreAuthorize("hasRole('ADMIN')")` to prevent non-admin callers from resetting user passwords.
+  2. **`AuthController.register` (HIGH)**: Added `@Valid` on `@RequestBody User user` and forced `Role.CLIENT` regardless of incoming payload to eliminate self-registration privilege escalation.
+  3. **`LoyaltyController.getLoyaltyAccountById` & `getLoyaltyAccountByUserId` (HIGH)**: Injected `@AuthenticationPrincipal UserPrincipal principal` and enforced ownership checks (`AccessDeniedException` when a `CLIENT` requests another user's loyalty account; `ADMIN` and `EMPLOYEE` retain access).
+  4. **`RoomController.updateRoomStatus` (MEDIUM)**: Added `@Valid` on request body and `@NotNull` on `RoomStatusUpdateRequest.newStatus`.
+  5. **OSIV Disabled (MEDIUM)**: Set `spring.jpa.open-in-view: false` in `application.yml`, `application-dev.yml`, and `application-test.yml` to fail fast on any accidental lazy-load outside service transaction boundaries.
+  6. **Exception Handling & 500-Leak Hardening (MEDIUM, Pass 2)**:
+     - `GlobalExceptionHandler`: Replaced `ex.printStackTrace()` and raw `ex.getMessage()` 500 responses with SLF4J error logging and a generic `"An unexpected error occurred"` message; added 400/405 handlers for `IllegalArgumentException`, `DateTimeParseException`, `HttpMessageNotReadableException`, `MethodArgumentTypeMismatchException`, `MissingServletRequestParameterException`, and `HttpRequestMethodNotSupportedException`.
+     - `EmployeeController.updateMyTask`: Replaced `new RuntimeException(...)` with `NotFoundException` (returns `404` instead of `500`).
+     - `AdminReservationController.getAllReservations` & `EmployeeReservationController` (`searchReservations`, `getReservationsByDateRange`): Removed broad `catch (Exception e)` blocks so invalid `ReservationStatus` / `LocalDate` parameters propagate to `GlobalExceptionHandler` as `400 Bad Request`.
+- **Scope & Limits**:
+  - Covers controller authorization, ownership enforcement on loyalty accounts, registration role enforcement, validation annotations, and OSIV configuration.
+  - **Known Accepted / Deferred Items**:
+    - `AuthController` and `RoomController` still accept/return raw JPA entities (`User`, `NotificationPreference`, `Room`) on certain legacy endpoints to preserve existing API and test contracts; `open-in-view: false` prevents accidental lazy serialization.
+    - `SecurityConfig` retains broad `permitAll()` matchers on `/api/rooms/**`, `/api/events/**`, and `/api/announcements/**`, relying on method-level `@PreAuthorize` on mutating/admin endpoints.
+    - `FeedbackController` and `FeedbackReplyController` allow `CLIENT` read access by ID/reservation under the current public-reviews policy assumption.
+    - `AuthController.logout` remains stateless/no-op until **Milestone IdP** (Keycloak + Next.js BFF).
+- **Observed Results**:
+  - **5 / 5 tests passed** (`Tests run: 5, Failures: 0, Errors: 0, Skipped: 0`, `BUILD SUCCESS`) in `Phase3ControllerSecurityAlignmentTest`.
+  - **Pass 3 Audit Clean Sign-Off**: Zero remaining HIGH or MEDIUM issues across all 18 `*Controller.java` files, `SecurityConfig.java`, `GlobalExceptionHandler.java`, and `application*.yml`; remaining LOW-severity hygiene items (`printStackTrace()`, `System.out`/`System.err`, and redundant generic `catch (Exception e)` blocks in `InstallationController`, `RoomController`, `ClientReservationController`, `AdminReservationController`, and `EmployeeReservationController`) were also cleaned up.
+
+---
+
+## 9. Evolution Path to Milestone IdP & Phase 4
+
+Upon completion of tickets `P3-T01` through `P3-T12` (including Backend Services Auditor Passes 1–6 / Batches 1–7), the full Phase 3 domain refactoring and verification roadmap is certified:
 - `P3-T01`: Reservation Overlap JPQL & Self-Conflict Exemption (`INV-RES-001`, `INV-RES-002`) — *COMPLETED*
 - `P3-T02`: Physical Room Status Decoupling (`INV-ROOM-001`) — *COMPLETED*
 - `P3-T03`: Event Participant Capacity Aggregation & Overbooking Prevention (`INV-EVT-001`, `INV-EVT-002`) — *COMPLETED*
@@ -497,6 +576,9 @@ Upon completion of tickets `P3-T01` through `P3-T09`, the full Phase 3 domain re
     - `EventService`: Replaced 4 remaining `findAll()` scans (`getEventsByDateRange`, `getUpcomingEvents`, `getEventsByInstallationType`, `getEventStatistics`) and `getRevenueByCurrency` stream sum with database queries; fixed `searchEventsAsDto` hardcoded `"EUR"` currency and `getUpcomingEventsAsDto` returning past events.
     - `EmployeeService`: Added `findByUserIdForUpdate` locks to `createLeaveRequest` and `updateShift`; fixed `searchShifts` ignoring `startAt`/`endAt` when `employeeId` is provided.
     - `LoyaltyService`, `FeedbackService`, `AnalyticsService`: Replaced `getRecentTransactions` in-memory filter with `findByAccountIdAndCreatedAtAfterOrderByCreatedAtDesc`; replaced hardcoded `0L` comments count in `getFeedbackStatistics` with `countFeedbacksWithComments()`; replaced `getTotalActiveCustomers` `findAll()`-by-role with `authService.countUsersByRole(Role.CLIENT)`.
+- `P3-T10`: Real Database Concurrency & Pessimistic Locking Verification via Testcontainers PostgreSQL (`Phase3AuditConcurrencyTest`: 5/5 passed) — *COMPLETED*
+- `P3-T11`: Runtime SQL Query-Count / N+1 Verification via `hibernate.generate_statistics` (`Phase3QueryPerformanceTest`: 1/1 passed) — *COMPLETED*
+- `P3-T12`: Controller & Security Layer Alignment Audit (Passes 1 & 2), Hardening Fixes (`AuthController`, `LoyaltyController`, `RoomController`, `GlobalExceptionHandler`, `EmployeeController`, `AdminReservationController`, `EmployeeReservationController`, `open-in-view: false`), & MockMvc Verification (`Phase3ControllerSecurityAlignmentTest`: 5/5 passed) — *COMPLETED*
 
 The platform will then advance to **Milestone IdP**:
 1. **Keycloak Identity Provider Adoption**: Centralized OAuth2/OIDC realm configuration (`mybooking-platform`), Docker Compose topology, user migration preserving database IDs.
@@ -505,10 +587,10 @@ The platform will then advance to **Milestone IdP**:
 
 ---
 
-## 9. Formal Sign-off & Architectural Acceptance
+## 10. Formal Sign-off & Architectural Acceptance
 
 - **Phase Technical Status**: **COMPLETE & FULLY VERIFIED**
-- **Regression Baseline**: **1,180 / 1,180 Tests Passing (100%)**
+- **Regression Baseline**: **1,213 / 1,213 Tests Passing (100%)**
 - **Sign-off Date**: November 2026
 - **Architecture Governance Alignment**: Reconciled 15-Phase Roadmap & Domain Invariants Matrix Certified.
 

@@ -38,25 +38,17 @@ public class ClientReservationController {
     public ResponseEntity<ReservationResponseDto> createReservation(
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody ReservationCreateRequestDto request) {
-        try {
-            Long clientId = principal.getId();
-            
-            // Use points redemption method if points are being used
-            ReservationResponseDto response;
-            if (request.getPointsUsed() != null && request.getPointsUsed() > 0) {
-                response = reservationService.createReservationWithPoints(request, clientId);
-            } else {
-                response = reservationService.createReservation(request, clientId);
-            }
-            
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (BusinessRuleException e) {
-            e.printStackTrace();
-            throw e; // Let GlobalExceptionHandler handle it
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw e; // Let GlobalExceptionHandler handle it
+        Long clientId = principal.getId();
+
+        // Use points redemption method if points are being used
+        ReservationResponseDto response;
+        if (request.getPointsUsed() != null && request.getPointsUsed() > 0) {
+            response = reservationService.createReservationWithPoints(request, clientId);
+        } else {
+            response = reservationService.createReservation(request, clientId);
         }
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
     /**
@@ -68,13 +60,9 @@ public class ClientReservationController {
     public ResponseEntity<Page<ReservationResponseDto>> getMyReservations(
             @AuthenticationPrincipal UserPrincipal principal,
             Pageable pageable) {
-        try {
-            Long clientId = principal.getId();
-            Page<ReservationResponseDto> reservations = reservationService.getReservationsByClientId(clientId, pageable);
-            return ResponseEntity.ok(reservations);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Long clientId = principal.getId();
+        Page<ReservationResponseDto> reservations = reservationService.getReservationsByClientId(clientId, pageable);
+        return ResponseEntity.ok(reservations);
     }
 
     /**
@@ -92,67 +80,28 @@ public class ClientReservationController {
             @RequestParam(required = false) String checkOutFrom,
             @RequestParam(required = false) String checkOutTo,
             Pageable pageable) {
-        try {
-            Long clientId = principal.getId();
-            
-            // Create search criteria DTO
-            ReservationSearchCriteriaDto criteria = new ReservationSearchCriteriaDto();
-            criteria.setClientId(clientId);
-            criteria.setRoomId(roomId);
-            criteria.setStatus(status);
-            
-            // Parse date parameters with proper error handling
-            if (checkInFrom != null && !checkInFrom.trim().isEmpty()) {
-                try {
-                    criteria.setCheckInFrom(java.time.LocalDate.parse(checkInFrom));
-                } catch (Exception e) {
-                    System.err.println("Error parsing checkInFrom: " + checkInFrom + " - " + e.getMessage());
-                    return ResponseEntity.badRequest().build();
-                }
-            }
-            if (checkInTo != null && !checkInTo.trim().isEmpty()) {
-                try {
-                    criteria.setCheckInTo(java.time.LocalDate.parse(checkInTo));
-                } catch (Exception e) {
-                    System.err.println("Error parsing checkInTo: " + checkInTo + " - " + e.getMessage());
-                    return ResponseEntity.badRequest().build();
-                }
-            }
-            if (checkOutFrom != null && !checkOutFrom.trim().isEmpty()) {
-                try {
-                    criteria.setCheckOutFrom(java.time.LocalDate.parse(checkOutFrom));
-                } catch (Exception e) {
-                    System.err.println("Error parsing checkOutFrom: " + checkOutFrom + " - " + e.getMessage());
-                    return ResponseEntity.badRequest().build();
-                }
-            }
-            if (checkOutTo != null && !checkOutTo.trim().isEmpty()) {
-                try {
-                    criteria.setCheckOutTo(java.time.LocalDate.parse(checkOutTo));
-                } catch (Exception e) {
-                    System.err.println("Error parsing checkOutTo: " + checkOutTo + " - " + e.getMessage());
-                    return ResponseEntity.badRequest().build();
-                }
-            }
-            
-            System.out.println("Search criteria: " + criteria);
-            
-            // Test direct repository call to isolate the issue
-            try {
-                System.out.println("Calling reservationService.searchReservationsAsDto...");
-                Page<ReservationResponseDto> reservations = reservationService.searchReservationsAsDto(criteria, pageable);
-                System.out.println("Search completed successfully, found " + reservations.getTotalElements() + " reservations");
-                return ResponseEntity.ok(reservations);
-            } catch (Exception serviceException) {
-                System.err.println("Service exception: " + serviceException.getMessage());
-                serviceException.printStackTrace();
-                throw serviceException;
-            }
-        } catch (Exception e) {
-            System.err.println("Error in searchMyReservations: " + e.getMessage());
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        Long clientId = principal.getId();
+
+        ReservationSearchCriteriaDto criteria = new ReservationSearchCriteriaDto();
+        criteria.setClientId(clientId);
+        criteria.setRoomId(roomId);
+        criteria.setStatus(status);
+
+        if (checkInFrom != null && !checkInFrom.trim().isEmpty()) {
+            criteria.setCheckInFrom(java.time.LocalDate.parse(checkInFrom));
         }
+        if (checkInTo != null && !checkInTo.trim().isEmpty()) {
+            criteria.setCheckInTo(java.time.LocalDate.parse(checkInTo));
+        }
+        if (checkOutFrom != null && !checkOutFrom.trim().isEmpty()) {
+            criteria.setCheckOutFrom(java.time.LocalDate.parse(checkOutFrom));
+        }
+        if (checkOutTo != null && !checkOutTo.trim().isEmpty()) {
+            criteria.setCheckOutTo(java.time.LocalDate.parse(checkOutTo));
+        }
+
+        Page<ReservationResponseDto> reservations = reservationService.searchReservationsAsDto(criteria, pageable);
+        return ResponseEntity.ok(reservations);
     }
 
     /**
@@ -168,12 +117,8 @@ public class ClientReservationController {
             Long clientId = principal.getId();
             ReservationResponseDto reservation = reservationService.getReservationByIdAndClientId(id, clientId);
             return ResponseEntity.ok(reservation);
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
         } catch (BusinessRuleException e) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
@@ -187,17 +132,9 @@ public class ClientReservationController {
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal,
             @Valid @RequestBody ReservationUpdateRequestDto request) {
-        try {
-            Long clientId = principal.getId();
-            ReservationResponseDto updatedReservation = reservationService.updateReservation(id, request, clientId);
-            return ResponseEntity.ok(updatedReservation);
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (BusinessRuleException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Long clientId = principal.getId();
+        ReservationResponseDto updatedReservation = reservationService.updateReservation(id, request, clientId);
+        return ResponseEntity.ok(updatedReservation);
     }
 
     /**
@@ -209,16 +146,8 @@ public class ClientReservationController {
     public ResponseEntity<Void> cancelReservation(
             @PathVariable Long id,
             @AuthenticationPrincipal UserPrincipal principal) {
-        try {
-            Long clientId = principal.getId();
-            reservationService.cancelReservation(id, clientId);
-            return ResponseEntity.noContent().build();
-        } catch (NotFoundException e) {
-            return ResponseEntity.notFound().build();
-        } catch (BusinessRuleException e) {
-            return ResponseEntity.badRequest().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
+        Long clientId = principal.getId();
+        reservationService.cancelReservation(id, clientId);
+        return ResponseEntity.noContent().build();
     }
 }

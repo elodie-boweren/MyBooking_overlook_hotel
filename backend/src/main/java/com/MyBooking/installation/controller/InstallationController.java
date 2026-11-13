@@ -29,13 +29,8 @@ public class InstallationController {
     @GetMapping
     @PreAuthorize("hasAnyRole('CLIENT', 'ADMIN')")
     public ResponseEntity<List<InstallationResponseDto>> getAllInstallations() {
-        try {
-            List<InstallationResponseDto> responseDtos = installationService.getAllInstallationsForApi();
-            return ResponseEntity.ok(responseDtos);
-        } catch (Exception e) {
-            // Return empty list if no installations exist
-            return ResponseEntity.ok(new ArrayList<>());
-        }
+        List<InstallationResponseDto> responseDtos = installationService.getAllInstallationsForApi();
+        return ResponseEntity.ok(responseDtos);
     }
     
     /**

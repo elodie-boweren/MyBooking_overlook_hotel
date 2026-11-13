@@ -1,5 +1,6 @@
 package com.MyBooking.loyalty.controller;
 
+import com.MyBooking.auth.domain.Role;
 import com.MyBooking.common.security.UserPrincipal;
 import com.MyBooking.loyalty.dto.*;
 import com.MyBooking.loyalty.service.LoyaltyService;
@@ -104,8 +105,14 @@ public class LoyaltyController {
      */
     @GetMapping("/account/{accountId}")
     @PreAuthorize("hasAnyRole('CLIENT', 'EMPLOYEE', 'ADMIN')")
-    public ResponseEntity<LoyaltyAccountResponseDto> getLoyaltyAccountById(@PathVariable Long accountId) {
+    public ResponseEntity<LoyaltyAccountResponseDto> getLoyaltyAccountById(
+            @PathVariable Long accountId,
+            @AuthenticationPrincipal UserPrincipal principal) {
         LoyaltyAccountResponseDto response = loyaltyService.getLoyaltyAccountByIdAsDto(accountId);
+        if (!Role.ADMIN.name().equals(principal.getRole()) && !Role.EMPLOYEE.name().equals(principal.getRole())
+                && !response.getUserId().equals(principal.getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Cannot access another user's loyalty account");
+        }
         return ResponseEntity.ok(response);
     }
 
@@ -114,7 +121,13 @@ public class LoyaltyController {
      */
     @GetMapping("/account/user/{userId}")
     @PreAuthorize("hasAnyRole('CLIENT', 'EMPLOYEE', 'ADMIN')")
-    public ResponseEntity<LoyaltyAccountResponseDto> getLoyaltyAccountByUserId(@PathVariable Long userId) {
+    public ResponseEntity<LoyaltyAccountResponseDto> getLoyaltyAccountByUserId(
+            @PathVariable Long userId,
+            @AuthenticationPrincipal UserPrincipal principal) {
+        if (!Role.ADMIN.name().equals(principal.getRole()) && !Role.EMPLOYEE.name().equals(principal.getRole())
+                && !userId.equals(principal.getId())) {
+            throw new org.springframework.security.access.AccessDeniedException("Cannot access another user's loyalty account");
+        }
         LoyaltyAccountResponseDto response = loyaltyService.getLoyaltyAccountByUserIdAsDto(userId);
         return ResponseEntity.ok(response);
     }

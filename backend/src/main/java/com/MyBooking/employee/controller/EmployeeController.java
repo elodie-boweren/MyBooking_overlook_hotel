@@ -60,7 +60,7 @@ public class EmployeeController {
                 .stream()
                 .filter(t -> t.getId().equals(taskId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Task not found or not assigned to you"));
+                .orElseThrow(() -> new com.MyBooking.common.exception.NotFoundException("Task not found or not assigned to you"));
         
         EmployeeTask updatedTask = employeeService.updateTaskStatus(taskId, request.getStatus(), request.getNote());
         TaskResponseDto response = convertToTaskResponseDto(updatedTask);

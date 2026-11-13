@@ -6,6 +6,7 @@ spring:
     username: ${DB_USER:mybooking}
     password: ${DB_PASS:mybooking}
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: update
     properties:

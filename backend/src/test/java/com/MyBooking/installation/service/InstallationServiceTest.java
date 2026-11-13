@@ -236,8 +236,7 @@ class InstallationServiceTest {
         LocalDateTime endDateTime = LocalDateTime.of(2024, 6, 16, 12, 0);
 
         when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
-        when(eventRepository.findByInstallation(testInstallation)).thenReturn(Collections.emptyList());
-        when(eventRepository.checkEventAvailability(startDateTime, endDateTime)).thenReturn(Collections.emptyList());
+        when(eventRepository.existsOverlappingEventForInstallation(installationId, startDateTime, endDateTime)).thenReturn(false);
 
         // When
         boolean result = installationService.isInstallationAvailable(installationId, startDateTime, endDateTime);
@@ -245,7 +244,7 @@ class InstallationServiceTest {
         // Then
         assertThat(result).isTrue();
         verify(installationRepository).findByIdWithoutEvents(installationId);
-        verify(eventRepository).checkEventAvailability(startDateTime, endDateTime);
+        verify(eventRepository).existsOverlappingEventForInstallation(installationId, startDateTime, endDateTime);
     }
 
     @Test
@@ -256,8 +255,7 @@ class InstallationServiceTest {
         LocalDateTime endDateTime = LocalDateTime.of(2024, 6, 15, 12, 0);
 
         when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
-        when(eventRepository.findByInstallation(testInstallation)).thenReturn(Arrays.asList(testEvent));
-        when(eventRepository.checkEventAvailability(startDateTime, endDateTime)).thenReturn(Arrays.asList(testEvent));
+        when(eventRepository.existsOverlappingEventForInstallation(installationId, startDateTime, endDateTime)).thenReturn(true);
 
         // When
         boolean result = installationService.isInstallationAvailable(installationId, startDateTime, endDateTime);
@@ -265,7 +263,7 @@ class InstallationServiceTest {
         // Then
         assertThat(result).isFalse();
         verify(installationRepository).findByIdWithoutEvents(installationId);
-        verify(eventRepository).checkEventAvailability(startDateTime, endDateTime);
+        verify(eventRepository).existsOverlappingEventForInstallation(installationId, startDateTime, endDateTime);
     }
 
     @Test
@@ -307,10 +305,8 @@ class InstallationServiceTest {
         InstallationType installationType = InstallationType.CONFERENCE_ROOM;
 
         List<Installation> suitableInstallations = Arrays.asList(testInstallation);
-        when(installationRepository.findSuitableForParticipants(participants)).thenReturn(suitableInstallations);
-        when(installationRepository.findByIdWithoutEvents(testInstallation.getId())).thenReturn(Optional.of(testInstallation));
-        when(eventRepository.findByInstallation(testInstallation)).thenReturn(Collections.emptyList());
-        when(eventRepository.checkEventAvailability(startDateTime, endDateTime)).thenReturn(Collections.emptyList());
+        when(installationRepository.findAvailableInstallations(startDateTime, endDateTime, participants, installationType))
+                .thenReturn(suitableInstallations);
 
         // When
         List<Installation> result = installationService.findAvailableInstallations(startDateTime, endDateTime, participants, installationType);
@@ -319,7 +315,7 @@ class InstallationServiceTest {
         assertThat(result).isNotNull();
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getName()).isEqualTo("Grand Ballroom");
-        verify(installationRepository).findSuitableForParticipants(participants);
+        verify(installationRepository).findAvailableInstallations(startDateTime, endDateTime, participants, installationType);
     }
 
     // ==================== PRICING & COST CALCULATION TESTS ====================

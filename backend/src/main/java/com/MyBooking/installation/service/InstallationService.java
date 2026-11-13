@@ -128,19 +128,8 @@ public class InstallationService {
 
     @Transactional(readOnly = true)
     public boolean isInstallationAvailable(Long installationId, LocalDateTime startDateTime, LocalDateTime endDateTime) {
-        Installation installation = getInstallationById(installationId);
-        
-        // Get all events for this installation
-        List<Event> installationEvents = eventRepository.findByInstallation(installation);
-        
-        // Check for overlapping events using the repository method
-        List<Event> overlappingEvents = eventRepository.checkEventAvailability(startDateTime, endDateTime);
-        
-        // Filter to only events for this specific installation
-        boolean hasOverlappingEvents = overlappingEvents.stream()
-                .anyMatch(event -> event.getInstallation().getId().equals(installationId));
-        
-        return !hasOverlappingEvents;
+        getInstallationById(installationId);
+        return !eventRepository.existsOverlappingEventForInstallation(installationId, startDateTime, endDateTime);
     }
 
     @Transactional(readOnly = true)
@@ -152,19 +141,7 @@ public class InstallationService {
     @Transactional(readOnly = true)
     public List<Installation> findAvailableInstallations(LocalDateTime startDateTime, LocalDateTime endDateTime, 
                                                         Integer participants, InstallationType installationType) {
-        // Find installations that can accommodate the participants
-        List<Installation> suitableInstallations = installationRepository.findSuitableForParticipants(participants);
-        
-        if (installationType != null) {
-            suitableInstallations = suitableInstallations.stream()
-                    .filter(inst -> inst.getInstallationType() == installationType)
-                    .collect(Collectors.toList());
-        }
-        
-        // Filter by availability
-        return suitableInstallations.stream()
-                .filter(inst -> isInstallationAvailable(inst.getId(), startDateTime, endDateTime))
-                .collect(Collectors.toList());
+        return installationRepository.findAvailableInstallations(startDateTime, endDateTime, participants, installationType);
     }
 
     @Transactional(readOnly = true)

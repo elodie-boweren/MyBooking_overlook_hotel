@@ -289,6 +289,27 @@ public interface EventRepository extends JpaRepository<Event, Long> {
            "(e.startAt >= :startTime AND e.endAt <= :endTime)")
     List<Event> checkEventAvailability(@Param("startTime") LocalDateTime startTime, 
                                     @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * Check whether any event exists for a specific installation in the given half-open time range [startTime, endTime).
+     */
+    @Query("SELECT COUNT(e) > 0 FROM Event e WHERE e.installation.id = :installationId " +
+           "AND e.startAt < :endTime AND e.endAt > :startTime")
+    boolean existsOverlappingEventForInstallation(@Param("installationId") Long installationId,
+                                                  @Param("startTime") LocalDateTime startTime,
+                                                  @Param("endTime") LocalDateTime endTime);
+
+    /**
+     * Check whether any other event (excluding excludeEventId) exists for a specific installation
+     * in the given half-open time range [startTime, endTime).
+     */
+    @Query("SELECT COUNT(e) > 0 FROM Event e WHERE e.installation.id = :installationId " +
+           "AND e.id <> :excludeEventId " +
+           "AND e.startAt < :endTime AND e.endAt > :startTime")
+    boolean existsOverlappingEventForInstallationExcludingEvent(@Param("installationId") Long installationId,
+                                                                @Param("startTime") LocalDateTime startTime,
+                                                                @Param("endTime") LocalDateTime endTime,
+                                                                @Param("excludeEventId") Long excludeEventId);
     
     /**
      * Find events created between specified dates.

@@ -420,4 +420,27 @@ class EventRepositoryTest {
         assertThat(eventsPage.getContent()).hasSize(2);
         assertThat(eventsPage.getTotalElements()).isEqualTo(2);
     }
+
+    @Test
+    void testExistsOverlappingEventForInstallationAndSelfExclusion() {
+        // spaEvent is 2024-01-15 10:00 to 11:00 on spaInstallation
+        LocalDateTime overlappingStart = LocalDateTime.of(2024, 1, 15, 10, 30);
+        LocalDateTime overlappingEnd = LocalDateTime.of(2024, 1, 15, 11, 30);
+        LocalDateTime adjacentStart = LocalDateTime.of(2024, 1, 15, 11, 0);
+        LocalDateTime adjacentEnd = LocalDateTime.of(2024, 1, 15, 12, 0);
+
+        assertThat(eventRepository.existsOverlappingEventForInstallation(
+                spaInstallation.getId(), overlappingStart, overlappingEnd)).isTrue();
+        assertThat(eventRepository.existsOverlappingEventForInstallation(
+                spaInstallation.getId(), adjacentStart, adjacentEnd)).isFalse();
+        assertThat(eventRepository.existsOverlappingEventForInstallation(
+                conferenceInstallation.getId(), overlappingStart, overlappingEnd)).isFalse();
+
+        // Excluding spaEvent itself should allow the update
+        assertThat(eventRepository.existsOverlappingEventForInstallationExcludingEvent(
+                spaInstallation.getId(), overlappingStart, overlappingEnd, spaEvent.getId())).isFalse();
+        // Excluding a different event still detects spaEvent as conflicting
+        assertThat(eventRepository.existsOverlappingEventForInstallationExcludingEvent(
+                spaInstallation.getId(), overlappingStart, overlappingEnd, conferenceEvent.getId())).isTrue();
+    }
 }

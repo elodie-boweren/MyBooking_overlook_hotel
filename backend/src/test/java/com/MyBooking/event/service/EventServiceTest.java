@@ -115,7 +115,7 @@ class EventServiceTest {
     void createEvent_WithValidData_ShouldCreateEvent() {
         // Given
         when(installationRepository.findById(1L)).thenReturn(Optional.of(testInstallation));
-        when(eventRepository.findByInstallationId(1L)).thenReturn(Collections.emptyList());
+        when(eventRepository.existsOverlappingEventForInstallation(1L, testStartTime, testEndTime)).thenReturn(false);
         when(eventRepository.save(any(Event.class))).thenReturn(testEvent);
 
         // When
@@ -132,7 +132,7 @@ class EventServiceTest {
         assertThat(result.getInstallation()).isEqualTo(testInstallation);
 
         verify(installationRepository).findById(1L);
-        verify(eventRepository).findByInstallationId(1L);
+        verify(eventRepository).existsOverlappingEventForInstallation(1L, testStartTime, testEndTime);
         verify(eventRepository).save(any(Event.class));
     }
 
@@ -208,7 +208,7 @@ class EventServiceTest {
         conflictingEvent.setEndAt(testEndTime.plusMinutes(30));
 
         when(installationRepository.findById(1L)).thenReturn(Optional.of(testInstallation));
-        when(eventRepository.findByInstallationId(1L)).thenReturn(Arrays.asList(conflictingEvent));
+        when(eventRepository.existsOverlappingEventForInstallation(1L, testStartTime, testEndTime)).thenReturn(true);
 
         // When & Then
         assertThatThrownBy(() -> eventService.createEvent(
@@ -218,7 +218,7 @@ class EventServiceTest {
           .hasMessageContaining("Installation is not available for the selected time");
 
         verify(installationRepository).findById(1L);
-        verify(eventRepository).findByInstallationId(1L);
+        verify(eventRepository).existsOverlappingEventForInstallation(1L, testStartTime, testEndTime);
         verify(eventRepository, never()).save(any());
     }
 
@@ -238,7 +238,8 @@ class EventServiceTest {
 
         when(eventRepository.findById(1L)).thenReturn(Optional.of(testEvent));
         when(installationRepository.findById(1L)).thenReturn(Optional.of(testInstallation));
-        when(eventRepository.findByInstallationId(1L)).thenReturn(Collections.emptyList());
+        when(eventRepository.existsOverlappingEventForInstallationExcludingEvent(
+                1L, testStartTime.plusHours(1), testEndTime.plusHours(1), 1L)).thenReturn(false);
         when(eventRepository.save(any(Event.class))).thenReturn(updatedEvent);
 
         // When
@@ -358,31 +359,27 @@ class EventServiceTest {
     @Test
     void isInstallationAvailable_WithNoConflicts_ShouldReturnTrue() {
         // Given
-        when(eventRepository.findByInstallationId(1L)).thenReturn(Collections.emptyList());
+        when(eventRepository.existsOverlappingEventForInstallation(1L, testStartTime, testEndTime)).thenReturn(false);
 
         // When
         boolean result = eventService.isInstallationAvailable(1L, testStartTime, testEndTime);
 
         // Then
         assertThat(result).isTrue();
-        verify(eventRepository).findByInstallationId(1L);
+        verify(eventRepository).existsOverlappingEventForInstallation(1L, testStartTime, testEndTime);
     }
 
     @Test
     void isInstallationAvailable_WithConflicts_ShouldReturnFalse() {
         // Given
-        Event conflictingEvent = new Event();
-        conflictingEvent.setStartAt(testStartTime.plusMinutes(30));
-        conflictingEvent.setEndAt(testEndTime.plusMinutes(30));
-
-        when(eventRepository.findByInstallationId(1L)).thenReturn(Arrays.asList(conflictingEvent));
+        when(eventRepository.existsOverlappingEventForInstallation(1L, testStartTime, testEndTime)).thenReturn(true);
 
         // When
         boolean result = eventService.isInstallationAvailable(1L, testStartTime, testEndTime);
 
         // Then
         assertThat(result).isFalse();
-        verify(eventRepository).findByInstallationId(1L);
+        verify(eventRepository).existsOverlappingEventForInstallation(1L, testStartTime, testEndTime);
     }
 
     // ========== SEARCH & FILTERING TESTS ==========

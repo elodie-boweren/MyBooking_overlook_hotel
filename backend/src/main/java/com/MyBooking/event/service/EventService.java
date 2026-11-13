@@ -240,14 +240,8 @@ public class EventService {
      * Check installation availability for new event
      */
     private void checkInstallationAvailability(Long installationId, LocalDateTime startAt, LocalDateTime endAt) {
-        // Get all events for this installation and check for overlaps manually
-        List<Event> installationEvents = eventRepository.findByInstallationId(installationId);
-        
-        for (Event event : installationEvents) {
-            if (isTimeOverlapping(startAt, endAt, event.getStartAt(), event.getEndAt())) {
-                throw new BusinessRuleException("Installation is not available for the selected time. " +
-                    "Conflicting with event: " + event.getName());
-            }
+        if (eventRepository.existsOverlappingEventForInstallation(installationId, startAt, endAt)) {
+            throw new BusinessRuleException("Installation is not available for the selected time.");
         }
     }
 
@@ -256,28 +250,10 @@ public class EventService {
      */
     private void checkInstallationAvailabilityForUpdate(Long installationId, LocalDateTime startAt, 
                                                        LocalDateTime endAt, Long excludeEventId) {
-        // Get all events for this installation and check for overlaps manually
-        List<Event> installationEvents = eventRepository.findByInstallationId(installationId);
-        
-        for (Event event : installationEvents) {
-            // Skip the current event being updated
-            if (event.getId().equals(excludeEventId)) {
-                continue;
-            }
-            
-            if (isTimeOverlapping(startAt, endAt, event.getStartAt(), event.getEndAt())) {
-                throw new BusinessRuleException("Installation is not available for the selected time. " +
-                    "Conflicting with event: " + event.getName());
-            }
+        if (eventRepository.existsOverlappingEventForInstallationExcludingEvent(
+                installationId, startAt, endAt, excludeEventId)) {
+            throw new BusinessRuleException("Installation is not available for the selected time.");
         }
-    }
-    
-    /**
-     * Check if two time ranges overlap
-     */
-    private boolean isTimeOverlapping(LocalDateTime start1, LocalDateTime end1, 
-                                    LocalDateTime start2, LocalDateTime end2) {
-        return start1.isBefore(end2) && end1.isAfter(start2);
     }
 
     // ========== INSTALLATION & AVAILABILITY ==========
@@ -287,14 +263,7 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public boolean isInstallationAvailable(Long installationId, LocalDateTime startAt, LocalDateTime endAt) {
-        List<Event> installationEvents = eventRepository.findByInstallationId(installationId);
-        
-        for (Event event : installationEvents) {
-            if (isTimeOverlapping(startAt, endAt, event.getStartAt(), event.getEndAt())) {
-                return false;
-            }
-        }
-        return true;
+        return !eventRepository.existsOverlappingEventForInstallation(installationId, startAt, endAt);
     }
 
     /**
@@ -303,21 +272,7 @@ public class EventService {
     @Transactional(readOnly = true)
     public List<Installation> getAvailableInstallations(LocalDateTime startAt, LocalDateTime endAt, 
                                                        Integer requiredCapacity, InstallationType installationType) {
-        // Get all installations
-        List<Installation> allInstallations = installationRepository.findAll();
-        
-        // Filter by type if specified
-        if (installationType != null) {
-            allInstallations = allInstallations.stream()
-                .filter(installation -> installation.getInstallationType() == installationType)
-                .toList();
-        }
-        
-        // Filter by capacity and availability
-        return allInstallations.stream()
-            .filter(installation -> installation.getCapacity() >= requiredCapacity)
-            .filter(installation -> isInstallationAvailable(installation.getId(), startAt, endAt))
-            .toList();
+        return installationRepository.findAvailableInstallations(startAt, endAt, requiredCapacity, installationType);
     }
 
     /**

@@ -250,4 +250,17 @@ public interface InstallationRepository extends JpaRepository<Installation, Long
            "i.hourlyRate, i.currency, i.equipment, i.createdAt, i.updatedAt) " +
            "FROM Installation i WHERE i.id = :id")
     Optional<com.MyBooking.installation.dto.InstallationResponseDto> findByIdAsProjection(@Param("id") Long id);
+
+    // ==================== AVAILABILITY QUERIES ====================
+
+    @Query("SELECT i FROM Installation i WHERE i.capacity >= :minCapacity " +
+           "AND (:installationType IS NULL OR i.installationType = :installationType) " +
+           "AND NOT EXISTS (" +
+           "  SELECT e FROM Event e WHERE e.installation = i " +
+           "  AND e.startAt < :endTime AND e.endAt > :startTime" +
+           ")")
+    List<Installation> findAvailableInstallations(@Param("startTime") LocalDateTime startTime,
+                                                  @Param("endTime") LocalDateTime endTime,
+                                                  @Param("minCapacity") Integer minCapacity,
+                                                  @Param("installationType") InstallationType installationType);
 }

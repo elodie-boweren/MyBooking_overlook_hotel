@@ -112,11 +112,16 @@ class ReservationTest {
         assertFalse(violations.isEmpty());
         assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Total price is required")));
 
-        // Test zero total price
+        // Test zero total price (valid when 100% covered by loyalty points)
         reservation.setTotalPrice(BigDecimal.ZERO);
         violations = validator.validate(reservation);
+        assertTrue(violations.isEmpty());
+
+        // Test negative total price
+        reservation.setTotalPrice(new BigDecimal("-0.01"));
+        violations = validator.validate(reservation);
         assertFalse(violations.isEmpty());
-        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Total price must be greater than 0")));
+        assertTrue(violations.stream().anyMatch(v -> v.getMessage().contains("Total price must be greater than or equal to 0")));
     }
 
     @Test

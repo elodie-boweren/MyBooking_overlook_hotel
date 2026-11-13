@@ -33,7 +33,7 @@ public class Reservation {
     private Integer numberOfGuests;
     
     @NotNull(message = "Total price is required")
-    @DecimalMin(value = "0.0", inclusive = false, message = "Total price must be greater than 0")
+    @DecimalMin(value = "0.0", inclusive = true, message = "Total price must be greater than or equal to 0")
     @Column(name = "total_price", nullable = false, precision = 12, scale = 2)
     private BigDecimal totalPrice;
     

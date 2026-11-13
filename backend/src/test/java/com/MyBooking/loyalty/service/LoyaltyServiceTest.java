@@ -531,7 +531,7 @@ class LoyaltyServiceTest {
     void processReservationPoints_WithValidReservation_ShouldEarnPoints() {
         // Given
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
-        when(loyaltyAccountRepository.findByUserId(1L)).thenReturn(Optional.of(testAccount));
+        when(loyaltyAccountRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testAccount));
         when(loyaltyTransactionRepository.save(any(LoyaltyTransaction.class))).thenReturn(testTransaction);
         when(loyaltyAccountRepository.save(any(LoyaltyAccount.class))).thenReturn(testAccount);
 
@@ -542,7 +542,7 @@ class LoyaltyServiceTest {
         assertThat(result).isNotNull();
 
         verify(reservationRepository, times(2)).findById(1L); // Called twice: once in processReservationPoints, once in earnPoints
-        verify(loyaltyAccountRepository).findByUserId(1L);
+        verify(loyaltyAccountRepository, times(2)).findByUserIdForUpdate(1L);
         verify(loyaltyTransactionRepository).save(any(LoyaltyTransaction.class));
         verify(loyaltyAccountRepository).save(any(LoyaltyAccount.class));
     }
@@ -735,5 +735,18 @@ class LoyaltyServiceTest {
         assertThat(testAccount.getBalance()).isEqualTo(1000);
         verify(loyaltyTransactionRepository, never()).save(any());
         verify(loyaltyAccountRepository, never()).save(any());
+    }
+
+    @Test
+    void processReservationPoints_WhenTotalPriceLessThanOneDollar_ShouldReturnNull() {
+        testReservation.setTotalPrice(BigDecimal.ZERO);
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(loyaltyAccountRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testAccount));
+        when(loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.EARN, 1L)).thenReturn(false);
+
+        LoyaltyTransaction result = loyaltyService.processReservationPoints(1L);
+
+        assertThat(result).isNull();
+        verify(loyaltyTransactionRepository, never()).save(any());
     }
 }

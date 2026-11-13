@@ -125,7 +125,7 @@ public class FeedbackService {
 
     @Transactional(readOnly = true)
     public Page<Feedback> getFeedbacksByRating(Integer rating, Pageable pageable) {
-        if (rating < 1 || rating > 5) {
+        if (rating == null || rating < 1 || rating > 5) {
             throw new BusinessRuleException("Rating must be between 1 and 5.");
         }
         return feedbackRepository.findByRating(rating, pageable);
@@ -133,7 +133,7 @@ public class FeedbackService {
 
     @Transactional(readOnly = true)
     public Page<Feedback> getFeedbacksByRatingRange(Integer minRating, Integer maxRating, Pageable pageable) {
-        if (minRating < 1 || maxRating > 5 || minRating > maxRating) {
+        if (minRating == null || maxRating == null || minRating < 1 || maxRating > 5 || minRating > maxRating) {
             throw new BusinessRuleException("Invalid rating range. Min: 1-5, Max: 1-5, Min <= Max.");
         }
         return feedbackRepository.findByRatingBetween(minRating, maxRating, pageable);
@@ -141,7 +141,7 @@ public class FeedbackService {
 
     @Transactional(readOnly = true)
     public Page<Feedback> getFeedbacksByDateRange(LocalDateTime startDate, LocalDateTime endDate, Pageable pageable) {
-        if (startDate.isAfter(endDate)) {
+        if (startDate == null || endDate == null || startDate.isAfter(endDate)) {
             throw new BusinessRuleException("Start date must be before end date.");
         }
         return feedbackRepository.findByCreatedAtBetween(startDate, endDate, pageable);
@@ -265,7 +265,7 @@ public class FeedbackService {
 
     @Transactional(readOnly = true)
     public long getFeedbackCountByRating(Integer rating) {
-        if (rating < 1 || rating > 5) {
+        if (rating == null || rating < 1 || rating > 5) {
             throw new BusinessRuleException("Rating must be between 1 and 5.");
         }
         return feedbackRepository.countByRating(rating);

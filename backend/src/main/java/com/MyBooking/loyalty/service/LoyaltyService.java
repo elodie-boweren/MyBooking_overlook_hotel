@@ -134,6 +134,9 @@ public class LoyaltyService {
 
         // Calculate points (1 point per $1 spent)
         Integer points = calculatePointsFromAmount(amount);
+        if (points == null || points <= 0) {
+            throw new BusinessRuleException("Amount is too small to earn at least 1 loyalty point");
+        }
 
         // Create transaction
         LoyaltyTransaction transaction = new LoyaltyTransaction(account, LoyaltyTxType.EARN, points);
@@ -275,6 +278,20 @@ public class LoyaltyService {
     }
 
     /**
+     * Validate points redemption for reservation while acquiring a pessimistic write lock on the account.
+     */
+    public void validateReservationPointsRedemptionForUpdate(Long userId, Integer points, BigDecimal reservationTotal) {
+        if (points == null || points <= 0) {
+            throw new BusinessRuleException("Points must be positive");
+        }
+
+        LoyaltyAccount account = loyaltyAccountRepository.findByUserIdForUpdate(userId)
+            .orElseThrow(() -> new NotFoundException("Loyalty account not found for user ID: " + userId));
+
+        validateReservationRedemptionRules(account, points, reservationTotal);
+    }
+
+    /**
      * Validate points redemption for reservation (with reservation-specific rules)
      */
     @Transactional(readOnly = true)
@@ -284,7 +301,10 @@ public class LoyaltyService {
         }
 
         LoyaltyAccount account = getLoyaltyAccountByUserId(userId);
-        
+        validateReservationRedemptionRules(account, points, reservationTotal);
+    }
+
+    private void validateReservationRedemptionRules(LoyaltyAccount account, Integer points, BigDecimal reservationTotal) {
         // Check if user has enough points
         if (account.getBalance() < points) {
             throw new BusinessRuleException("Insufficient points. Available: " + 
@@ -466,13 +486,21 @@ public class LoyaltyService {
             throw new BusinessRuleException("Reservation has no associated client");
         }
 
+        Long clientId = reservation.getClient().getId();
+        loyaltyAccountRepository.findByUserIdForUpdate(clientId)
+            .orElseGet(() -> getOrCreateLoyaltyAccount(clientId));
+
         if (loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.EARN, reservationId)) {
             return loyaltyTransactionRepository.findByTypeAndReservationId(LoyaltyTxType.EARN, reservationId)
                 .stream().findFirst().orElse(null);
         }
 
+        if (reservation.getTotalPrice() == null || calculatePointsFromAmount(reservation.getTotalPrice()) <= 0) {
+            return null;
+        }
+
         return earnPoints(
-            reservation.getClient().getId(),
+            clientId,
             reservation.getTotalPrice(),
             "Points earned from reservation #" + reservationId,
             reservationId

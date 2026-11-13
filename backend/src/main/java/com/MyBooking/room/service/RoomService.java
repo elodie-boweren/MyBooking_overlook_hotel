@@ -18,6 +18,7 @@ import com.MyBooking.auth.repository.UserRepository;
 import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -64,12 +65,7 @@ public class RoomService {
      */
     public Room createRoom(String number, RoomType roomType, BigDecimal price, 
                           String currency, Integer capacity, String description) {
-        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessRuleException("Room price must be greater than 0");
-        }
-        if (capacity == null || capacity < 1) {
-            throw new BusinessRuleException("Room capacity must be at least 1");
-        }
+        validateRoomPriceAndCapacity(price, capacity);
         // Validate room number uniqueness
         if (roomRepository.existsByNumber(number)) {
             throw new BusinessRuleException("Room number already exists: " + number);
@@ -84,7 +80,11 @@ public class RoomService {
         room.setDescription(description);
         room.setStatus(RoomStatus.AVAILABLE);
         
-        return roomRepository.save(room);
+        try {
+            return roomRepository.save(room);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessRuleException("Room number already exists: " + number);
+        }
     }
 
     /**
@@ -110,12 +110,7 @@ public class RoomService {
      */
     public Room updateRoom(Long roomId, String number, RoomType roomType, 
                           BigDecimal price, String currency, Integer capacity, String description, RoomStatus status) {
-        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessRuleException("Room price must be greater than 0");
-        }
-        if (capacity == null || capacity < 1) {
-            throw new BusinessRuleException("Room capacity must be at least 1");
-        }
+        validateRoomPriceAndCapacity(price, capacity);
         Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
         
@@ -124,11 +119,7 @@ public class RoomService {
             throw new BusinessRuleException("Room number already exists: " + number);
         }
 
-        if (status == RoomStatus.OUT_OF_SERVICE &&
-            reservationRepository.existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(
-                roomId, ReservationStatus.CONFIRMED, LocalDate.now())) {
-            throw new BusinessRuleException("Cannot mark room as out of service while it has active or future confirmed reservations");
-        }
+        ensureNoActiveReservationsForOutOfService(roomId, status);
 
         boolean hasActiveOverCapacityReservation = reservationRepository.findByRoomId(roomId).stream()
             .anyMatch(r -> r.getStatus() == ReservationStatus.CONFIRMED
@@ -146,7 +137,11 @@ public class RoomService {
         room.setDescription(description);
         room.setStatus(status);
         
-        return roomRepository.save(room);
+        try {
+            return roomRepository.save(room);
+        } catch (DataIntegrityViolationException ex) {
+            throw new BusinessRuleException("Room number already exists: " + number);
+        }
     }
 
     /**
@@ -198,6 +193,7 @@ public class RoomService {
     @Transactional(readOnly = true)
     public List<Room> getAvailableRooms(LocalDate checkIn, LocalDate checkOut, 
                                        RoomType roomType, Integer minCapacity) {
+        validateDateRange(checkIn, checkOut);
         return roomRepository.findAvailableRooms(checkIn, checkOut, roomType, minCapacity);
     }
 
@@ -232,6 +228,7 @@ public class RoomService {
     public Room updateRoomStatus(Long roomId, RoomStatus newStatus, User updatedBy) {
         Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
+        ensureNoActiveReservationsForOutOfService(roomId, newStatus);
         
         RoomStatus oldStatus = room.getStatus();
         room.setStatus(newStatus);
@@ -249,6 +246,7 @@ public class RoomService {
     public Room updateRoomStatus(Long roomId, RoomStatus newStatus, User updatedBy, String notes, String updateReason) {
         Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
+        ensureNoActiveReservationsForOutOfService(roomId, newStatus);
         RoomStatus oldStatus = room.getStatus();
         
         room.setStatus(newStatus);
@@ -304,6 +302,7 @@ public class RoomService {
     public Room updateRoomStatusAutomatically(Long roomId, RoomStatus newStatus, String reason) {
         Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
+        ensureNoActiveReservationsForOutOfService(roomId, newStatus);
         RoomStatus oldStatus = room.getStatus();
         
         room.setStatus(newStatus);
@@ -637,6 +636,7 @@ public class RoomService {
      */
     @Transactional(readOnly = true)
     public Page<Room> getAvailableRoomsForDateRange(LocalDate checkIn, LocalDate checkOut, Pageable pageable) {
+        validateDateRange(checkIn, checkOut);
         return roomRepository.findAvailableRoomsForDateRange(checkIn, checkOut, pageable);
     }
 
@@ -646,7 +646,31 @@ public class RoomService {
     @Transactional(readOnly = true)
     public Page<Room> getAvailableRoomsForDateRangeWithFilters(LocalDate checkIn, LocalDate checkOut, 
                                                           RoomType roomType, Integer minCapacity, Pageable pageable) {
+        validateDateRange(checkIn, checkOut);
         return roomRepository.findAvailableRoomsForDateRangeWithFilters(checkIn, checkOut, roomType, minCapacity, pageable);
+    }
+
+    private void validateRoomPriceAndCapacity(BigDecimal price, Integer capacity) {
+        if (price == null || price.compareTo(new BigDecimal("0.1")) <= 0) {
+            throw new BusinessRuleException("Room price must be greater than 0.1");
+        }
+        if (capacity == null || capacity < 1 || capacity > 10) {
+            throw new BusinessRuleException("Room capacity must be between 1 and 10");
+        }
+    }
+
+    private void validateDateRange(LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
+            throw new BusinessRuleException("Check-out date must be after check-in date");
+        }
+    }
+
+    private void ensureNoActiveReservationsForOutOfService(Long roomId, RoomStatus status) {
+        if (status == RoomStatus.OUT_OF_SERVICE &&
+            reservationRepository.existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(
+                roomId, ReservationStatus.CONFIRMED, LocalDate.now())) {
+            throw new BusinessRuleException("Cannot mark room as out of service while it has active or future confirmed reservations");
+        }
     }
 
     /**

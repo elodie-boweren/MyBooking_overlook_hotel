@@ -145,8 +145,8 @@ public class ReservationService {
         BigDecimal finalPrice = basePrice;
         
         if (pointsToRedeem != null && pointsToRedeem > 0) {
-            // Validate points redemption
-            loyaltyService.validateReservationPointsRedemption(clientId, pointsToRedeem, basePrice);
+            // Lock account and validate points redemption to avoid stale L1-cache reads before redeemPoints
+            loyaltyService.validateReservationPointsRedemptionForUpdate(clientId, pointsToRedeem, basePrice);
             
             // Calculate discount
             pointsDiscount = loyaltyService.calculatePointsDiscountAmount(pointsToRedeem);
@@ -196,6 +196,9 @@ public class ReservationService {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
             throw new BusinessRuleException("Check-out date must be after check-in date");
         }
+        if (numberOfGuests == null || numberOfGuests < 1) {
+            throw new BusinessRuleException("Number of guests must be at least 1");
+        }
         // Get room
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + roomId));
@@ -224,6 +227,9 @@ public class ReservationService {
                                         Integer numberOfGuests, Long clientId) {
         if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
             throw new BusinessRuleException("Check-out date must be after check-in date");
+        }
+        if (numberOfGuests == null || numberOfGuests < 1) {
+            throw new BusinessRuleException("Number of guests must be at least 1");
         }
         // Get room
         Room room = roomRepository.findById(roomId)
@@ -744,24 +750,19 @@ public class ReservationService {
      */
     @Transactional(readOnly = true)
     public Page<ReservationResponseDto> searchReservationsAsDto(ReservationSearchCriteriaDto criteria, Pageable pageable) {
-        // Use the new repository method that handles date parameters better
-        // Use appropriate repository method based on whether dates are provided
-        Page<Reservation> reservations;
-        if (criteria.getCheckInFrom() != null && criteria.getCheckInTo() != null) {
-            // Use date range method when both dates are provided
-            reservations = reservationRepository.findByClientIdAndDateRange(
-                criteria.getClientId(), 
-                criteria.getCheckInFrom(), 
-                criteria.getCheckInTo(), 
-                pageable
-            );
-        } else {
-            // Use simple client method when no dates are provided
-            reservations = reservationRepository.findByClientId(
-                criteria.getClientId(), 
-                pageable
-            );
-        }
+        Page<Reservation> reservations = reservationRepository.findByCriteria(
+            criteria.getClientId(),
+            criteria.getRoomId(),
+            criteria.getStatus(),
+            null,
+            null,
+            null,
+            null,
+            null,
+            criteria.getCheckInFrom(),
+            criteria.getCheckInTo(),
+            pageable
+        );
         return reservations.map(this::convertToResponseDto);
     }
 

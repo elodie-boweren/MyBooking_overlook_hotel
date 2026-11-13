@@ -58,6 +58,7 @@ public class AuthService {
      * Register a new user with specified role
      */
     public User registerUser(String email, String password, String firstName, String lastName, String phone, String address, LocalDate birthDate, Role role) {
+        validateRawPassword(password);
         String normalizedEmail = normalizeEmail(email);
         // Validate email uniqueness
         if (userRepository.existsByEmail(normalizedEmail)) {
@@ -139,6 +140,7 @@ public class AuthService {
      * Change user password
      */
     public void changePassword(String email, String currentPassword, String newPassword) {
+        validateRawPassword(newPassword);
         User user = getUserProfile(email);
         
         if (!passwordEncoder.matches(currentPassword, user.getPassword())) {
@@ -153,6 +155,7 @@ public class AuthService {
      * Reset password (for forgot password flow)
      */
     public void resetPassword(String email, String newPassword) {
+        validateRawPassword(newPassword);
         User user = getUserProfile(email);
         
         user.setPassword(passwordEncoder.encode(newPassword));
@@ -240,6 +243,7 @@ public class AuthService {
      */
     public User createUser(String email, String password, String firstName, String lastName, 
                           String phone, String address, LocalDate birthDate, Role role) {
+        validateRawPassword(password);
         String normalizedEmail = normalizeEmail(email);
         // Validate email uniqueness
         if (userRepository.existsByEmail(normalizedEmail)) {
@@ -310,6 +314,12 @@ public class AuthService {
 
     private String normalizeEmail(String email) {
         return email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private void validateRawPassword(String password) {
+        if (password == null || password.isBlank() || password.length() < 8) {
+            throw new BusinessRuleException("Password must be at least 8 characters");
+        }
     }
 
     /**

@@ -212,7 +212,7 @@ public interface AnnouncementRepository extends JpaRepository<Announcement, Long
     @Query("SELECT a FROM Announcement a WHERE a.status = :status " +
            "AND (a.targetDepartment = com.MyBooking.employee.domain.Department.ALL OR a.targetDepartment = :department) " +
            "AND (a.targetRole IS NULL OR a.targetRole = :role) " +
-           "ORDER BY CASE a.priority WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, a.createdAt DESC")
+           "ORDER BY CASE a.priority WHEN 'URGENT' THEN 1 WHEN 'HIGH' THEN 2 WHEN 'MEDIUM' THEN 3 ELSE 4 END, a.createdAt DESC")
     Page<Announcement> findVisibleAnnouncementsForAudience(
             @Param("department") Department department,
             @Param("role") Role role,

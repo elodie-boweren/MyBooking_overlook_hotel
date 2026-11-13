@@ -271,6 +271,9 @@ public class AnnouncementService {
      */
     @Transactional(readOnly = true)
     public List<Announcement> getAnnouncementsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
+        if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
+            throw new BusinessRuleException("End date must be on or after start date");
+        }
         return announcementRepository.findByCreatedAtBetween(startDate, endDate);
     }
 
@@ -279,6 +282,9 @@ public class AnnouncementService {
      */
     @Transactional(readOnly = true)
     public List<Announcement> getMostRepliedAnnouncements(int limit) {
+        if (limit < 1) {
+            throw new BusinessRuleException("Limit must be at least 1");
+        }
         return announcementRepository.findMostRepliedAnnouncements(PageRequest.of(0, limit));
     }
 

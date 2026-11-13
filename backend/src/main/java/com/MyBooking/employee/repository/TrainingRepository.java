@@ -33,7 +33,7 @@ public interface TrainingRepository extends JpaRepository<Training, Long> {
                                           @Param("endDate") LocalDate endDate);
 
     // Check if a specific training overlaps with others
-    @Query("SELECT t FROM Training t WHERE t.id != :trainingId AND t.startDate < :endDate AND t.endDate > :startDate")
+    @Query("SELECT t FROM Training t WHERE t.id != :trainingId AND t.startDate <= :endDate AND t.endDate >= :startDate")
     List<Training> findOverlappingTrainingsExcluding(@Param("trainingId") Long trainingId, 
                                                @Param("startDate") LocalDate startDate, 
                                                @Param("endDate") LocalDate endDate);

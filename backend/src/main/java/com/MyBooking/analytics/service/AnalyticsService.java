@@ -68,12 +68,13 @@ public class AnalyticsService {
         List<Reservation> overlappingReservations = reservationService.getOverlappingReservationsInDateRange(
             startDate, endDate, ReservationStatus.CONFIRMED);
         return buildRevenueAnalytics(startDate, endDate, overlappingReservations,
-            roomService.getRoomStatistics().getTotalRooms());
+            roomService.getRoomStatistics().getTotalRooms(), getTotalActiveCustomers());
     }
 
     private Map<String, Object> buildRevenueAnalytics(LocalDate startDate, LocalDate endDate,
                                                       List<Reservation> overlappingReservations,
-                                                      long totalRooms) {
+                                                      long totalRooms,
+                                                      long totalCustomers) {
         Map<String, Object> analytics = new HashMap<>();
 
         // Room revenue (prorated per night, eliminating cross-month double counting: INV-ANL-002)
@@ -95,7 +96,6 @@ public class AnalyticsService {
         analytics.put("revenueByService", revenueByService);
 
         // Average revenue per customer
-        long totalCustomers = getTotalActiveCustomers();
         BigDecimal avgRevenuePerCustomer = totalCustomers > 0 ?
             totalRevenue.divide(BigDecimal.valueOf(totalCustomers), 2, RoundingMode.HALF_UP) :
             BigDecimal.ZERO;
@@ -217,10 +217,12 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getCustomerInsights() {
+        return buildCustomerInsights(getTotalActiveCustomers(), feedbackService.getFeedbackStatistics());
+    }
+
+    private Map<String, Object> buildCustomerInsights(long totalCustomers,
+                                                      com.MyBooking.feedback.dto.FeedbackStatisticsDto feedbackStats) {
         Map<String, Object> insights = new HashMap<>();
-        
-        // Customer counts
-        long totalCustomers = getTotalActiveCustomers();
         
         // Active loyalty users (customers who have earned/redeemed points)
         long activeLoyaltyUsers = getActiveLoyaltyUsersCount();
@@ -232,7 +234,7 @@ public class AnalyticsService {
         insights.put("loyaltyEngagementRate", loyaltyEngagementRate);
         
         // Customer feedback and ratings
-        Map<String, Object> customerFeedback = getCustomerFeedbackAnalytics();
+        Map<String, Object> customerFeedback = buildCustomerFeedbackAnalytics(feedbackStats);
         insights.put("customerFeedback", customerFeedback);
         
         return insights;
@@ -243,14 +245,15 @@ public class AnalyticsService {
     @Transactional(readOnly = true)
     public Map<String, Object> getEmployeePerformance() {
         com.MyBooking.employee.dto.EmployeeStatisticsDto empStats = employeeService.getEmployeeStatisticsAsDto();
-        return buildEmployeePerformance(empStats);
+        return buildEmployeePerformance(empStats, employeeService.getRejectedLeaveRequestsCount());
     }
 
-    private Map<String, Object> buildEmployeePerformance(com.MyBooking.employee.dto.EmployeeStatisticsDto empStats) {
+    private Map<String, Object> buildEmployeePerformance(com.MyBooking.employee.dto.EmployeeStatisticsDto empStats,
+                                                         long rejectedLeaveRequests) {
         Map<String, Object> performance = new HashMap<>();
         performance.put("taskMetrics", getTaskCompletionMetrics());
         performance.put("trainingMetrics", getTrainingCompletionMetrics(empStats));
-        performance.put("leaveMetrics", getLeaveRequestMetrics(empStats));
+        performance.put("leaveMetrics", getLeaveRequestMetrics(empStats, rejectedLeaveRequests));
         return performance;
     }
 
@@ -283,7 +286,9 @@ public class AnalyticsService {
         LocalDate startDate = endDate.minusDays(30);
         List<Reservation> overlapping = reservationService.getOverlappingReservationsInDateRange(
             startDate, endDate, ReservationStatus.CONFIRMED);
-        return buildOperationalKPIs(empStats, totalRooms, totalInstallations, usedInstallations, overlapping, startDate, endDate);
+        return buildOperationalKPIs(empStats, totalRooms, totalInstallations, usedInstallations,
+            overlapping, startDate, endDate, reservationService.getReservationStatistics(),
+            feedbackService.getFeedbackStatistics(), getTotalActiveCustomers());
     }
 
     private Map<String, Object> buildOperationalKPIs(com.MyBooking.employee.dto.EmployeeStatisticsDto empStats,
@@ -292,17 +297,20 @@ public class AnalyticsService {
                                                      long usedInstallations,
                                                      List<Reservation> overlappingReservations,
                                                      LocalDate startDate,
-                                                     LocalDate endDate) {
+                                                     LocalDate endDate,
+                                                     com.MyBooking.reservation.service.ReservationService.ReservationStatistics resStats,
+                                                     com.MyBooking.feedback.dto.FeedbackStatisticsDto feedbackStats,
+                                                     long totalCustomers) {
         Map<String, Object> kpis = new HashMap<>();
         
         // System-wide metrics
         kpis.put("totalRooms", totalRooms);
         kpis.put("totalInstallations", totalInstallations);
         kpis.put("totalEmployees", empStats.getTotalEmployees());
-        kpis.put("totalCustomers", getTotalActiveCustomers());
+        kpis.put("totalCustomers", totalCustomers);
         
         // Service metrics
-        kpis.put("serviceMetrics", getServiceMetrics());
+        kpis.put("serviceMetrics", getServiceMetrics(resStats, feedbackStats));
         
         // Resource utilization
         kpis.put("resourceUtilization", getResourceUtilization(
@@ -313,16 +321,23 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getSystemPerformanceMetrics() {
+        return buildSystemPerformanceMetrics(
+            reservationService.getReservationStatistics(),
+            employeeService.getEmployeeStatisticsAsDto(),
+            roomService.getRoomStatistics().getTotalRooms(),
+            employeeService.getRejectedLeaveRequestsCount());
+    }
+
+    private Map<String, Object> buildSystemPerformanceMetrics(
+            com.MyBooking.reservation.service.ReservationService.ReservationStatistics resStats,
+            com.MyBooking.employee.dto.EmployeeStatisticsDto empStats,
+            long totalRooms,
+            long rejectedLeaveRequests) {
         Map<String, Object> metrics = new HashMap<>();
-        com.MyBooking.reservation.service.ReservationService.ReservationStatistics resStats =
-            reservationService.getReservationStatistics();
-        com.MyBooking.employee.dto.EmployeeStatisticsDto empStats =
-            employeeService.getEmployeeStatisticsAsDto();
-        long totalRooms = roomService.getRoomStatistics().getTotalRooms();
 
         double bookingSuccessRate = calculateBookingSuccessRate(resStats);
         metrics.put("bookingSuccessRate", bookingSuccessRate);
-        metrics.put("responseMetrics", getServiceResponseMetrics(bookingSuccessRate, empStats));
+        metrics.put("responseMetrics", getServiceResponseMetrics(bookingSuccessRate, empStats, rejectedLeaveRequests));
         metrics.put("healthIndicators", getSystemHealthIndicators(totalRooms, empStats));
         
         return metrics;
@@ -343,27 +358,35 @@ public class AnalyticsService {
         long totalRooms = roomService.getRoomStatistics().getTotalRooms();
         long totalInstallations = installationService.getTotalInstallationsCount();
         long usedInstallations = installationService.getUsedInstallationsCount();
+        long totalCustomers = getTotalActiveCustomers();
         com.MyBooking.employee.dto.EmployeeStatisticsDto empStats = employeeService.getEmployeeStatisticsAsDto();
+        com.MyBooking.reservation.service.ReservationService.ReservationStatistics resStats =
+            reservationService.getReservationStatistics();
+        com.MyBooking.feedback.dto.FeedbackStatisticsDto feedbackStats = feedbackService.getFeedbackStatistics();
+        long rejectedLeaveRequests = employeeService.getRejectedLeaveRequestsCount();
         
         // Revenue summary
-        dashboard.put("revenueSummary", buildRevenueAnalytics(startDate, endDate, overlappingReservations, totalRooms));
+        dashboard.put("revenueSummary", buildRevenueAnalytics(
+            startDate, endDate, overlappingReservations, totalRooms, totalCustomers));
         
         // Occupancy summary
         dashboard.put("occupancySummary", buildOccupancyMetrics(
             startDate, endDate, overlappingReservations, totalRooms, totalInstallations, usedInstallations));
         
         // Customer insights
-        dashboard.put("customerInsights", getCustomerInsights());
+        dashboard.put("customerInsights", buildCustomerInsights(totalCustomers, feedbackStats));
         
         // Employee performance
-        dashboard.put("employeePerformance", buildEmployeePerformance(empStats));
+        dashboard.put("employeePerformance", buildEmployeePerformance(empStats, rejectedLeaveRequests));
         
         // Operational KPIs
         dashboard.put("operationalKPIs", buildOperationalKPIs(
-            empStats, totalRooms, totalInstallations, usedInstallations, overlappingReservations, startDate, endDate));
+            empStats, totalRooms, totalInstallations, usedInstallations, overlappingReservations,
+            startDate, endDate, resStats, feedbackStats, totalCustomers));
         
         // System performance
-        dashboard.put("systemPerformance", getSystemPerformanceMetrics());
+        dashboard.put("systemPerformance", buildSystemPerformanceMetrics(
+            resStats, empStats, totalRooms, rejectedLeaveRequests));
         
         return dashboard;
     }
@@ -451,9 +474,8 @@ public class AnalyticsService {
         return endDate.toEpochDay() - startDate.toEpochDay() + 1;
     }
 
-    private Map<String, Object> getCustomerFeedbackAnalytics() {
+    private Map<String, Object> buildCustomerFeedbackAnalytics(com.MyBooking.feedback.dto.FeedbackStatisticsDto stats) {
         Map<String, Object> analytics = new HashMap<>();
-        com.MyBooking.feedback.dto.FeedbackStatisticsDto stats = feedbackService.getFeedbackStatistics();
 
         long totalFeedbacks = stats != null ? stats.getTotalFeedbacks() : 0L;
         analytics.put("totalFeedbacks", totalFeedbacks);
@@ -518,11 +540,11 @@ public class AnalyticsService {
         return metrics;
     }
 
-    private Map<String, Object> getLeaveRequestMetrics(com.MyBooking.employee.dto.EmployeeStatisticsDto stats) {
+    private Map<String, Object> getLeaveRequestMetrics(com.MyBooking.employee.dto.EmployeeStatisticsDto stats,
+                                                       long rejected) {
         Map<String, Object> metrics = new HashMap<>();
         long pending = stats != null ? stats.getPendingLeaveRequests() : 0L;
         long approved = stats != null ? stats.getApprovedLeaveRequests() : 0L;
-        long rejected = employeeService.getRejectedLeaveRequestsCount();
         long total = pending + approved + rejected;
 
         metrics.put("totalRequests", total);
@@ -551,14 +573,12 @@ public class AnalyticsService {
 
     // ==================== OPERATIONAL KPI HELPER METHODS ====================
 
-    private Map<String, Object> getServiceMetrics() {
+    private Map<String, Object> getServiceMetrics(
+            com.MyBooking.reservation.service.ReservationService.ReservationStatistics resStats,
+            com.MyBooking.feedback.dto.FeedbackStatisticsDto feedbackStats) {
         Map<String, Object> metrics = new HashMap<>();
-        com.MyBooking.reservation.service.ReservationService.ReservationStatistics resStats =
-            reservationService.getReservationStatistics();
         com.MyBooking.event.service.EventService.EventStatistics eventStats =
             eventService.getEventStatistics();
-        com.MyBooking.feedback.dto.FeedbackStatisticsDto feedbackStats =
-            feedbackService.getFeedbackStatistics();
 
         metrics.put("totalReservations", resStats != null ? resStats.getTotalReservations() : 0L);
         metrics.put("totalEvents", eventStats != null ? eventStats.getTotalEvents() : 0L);
@@ -598,11 +618,11 @@ public class AnalyticsService {
     }
 
     private Map<String, Object> getServiceResponseMetrics(double bookingSuccessRate,
-                                                          com.MyBooking.employee.dto.EmployeeStatisticsDto empStats) {
+                                                          com.MyBooking.employee.dto.EmployeeStatisticsDto empStats,
+                                                          long rejectedLeave) {
         Map<String, Object> metrics = new HashMap<>();
         long pendingLeave = empStats != null ? empStats.getPendingLeaveRequests() : 0L;
         long approvedLeave = empStats != null ? empStats.getApprovedLeaveRequests() : 0L;
-        long rejectedLeave = employeeService.getRejectedLeaveRequestsCount();
         long totalLeave = pendingLeave + approvedLeave + rejectedLeave;
         double leaveResolutionRate = totalLeave > 0 ? (double) (approvedLeave + rejectedLeave) / totalLeave * 100 : 100.0;
 

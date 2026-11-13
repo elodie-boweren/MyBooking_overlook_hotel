@@ -17,7 +17,7 @@ public class Room {
     
     @NotBlank(message = "Room number is required")
     @Size(max = 20, message = "Room number must not exceed 20 characters")
-    @Column(name = "number", nullable = false, length = 20)
+    @Column(name = "number", nullable = false, unique = true, length = 20)
     private String number;
     
     @NotNull(message = "Room type is required")

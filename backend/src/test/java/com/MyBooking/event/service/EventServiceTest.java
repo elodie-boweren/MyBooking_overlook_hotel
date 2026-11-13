@@ -282,7 +282,7 @@ class EventServiceTest {
         futureEvent.setStartAt(LocalDateTime.now().plusDays(2)); // More than 24 hours away
         
         when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(futureEvent));
-        when(eventBookingRepository.countByEventIdAndStatus(1L, EventBookingStatus.CONFIRMED)).thenReturn(0L);
+        when(eventBookingRepository.existsByEventId(1L)).thenReturn(false);
         doNothing().when(eventRepository).delete(any(Event.class));
 
         // When
@@ -290,7 +290,7 @@ class EventServiceTest {
 
         // Then
         verify(eventRepository).findByIdForUpdate(1L);
-        verify(eventBookingRepository).countByEventIdAndStatus(1L, EventBookingStatus.CONFIRMED);
+        verify(eventBookingRepository).existsByEventId(1L);
         verify(eventRepository).delete(any(Event.class));
     }
 
@@ -302,11 +302,11 @@ class EventServiceTest {
         futureEvent.setStartAt(LocalDateTime.now().plusDays(2));
 
         when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(futureEvent));
-        when(eventBookingRepository.countByEventIdAndStatus(1L, EventBookingStatus.CONFIRMED)).thenReturn(2L);
+        when(eventBookingRepository.existsByEventId(1L)).thenReturn(true);
 
         assertThatThrownBy(() -> eventService.deleteEvent(1L, "Test deletion"))
             .isInstanceOf(BusinessRuleException.class)
-            .hasMessageContaining("Cannot delete event with 2 confirmed booking(s)");
+            .hasMessageContaining("Cannot delete event with existing bookings");
 
         verify(eventRepository).findByIdForUpdate(1L);
         verify(eventRepository, never()).delete(any());
@@ -722,5 +722,16 @@ class EventServiceTest {
 
         assertThat(dto).isNotNull();
         verify(eventBookingRepository).save(argThat(b -> b.getDurationHours() != null && b.getDurationHours() == 1));
+    }
+
+    @Test
+    void createEvent_WithEightHoursThirtyMinutes_ShouldThrowBusinessRuleException() {
+        LocalDateTime startAt = LocalDateTime.now().plusDays(2);
+        LocalDateTime endAt = startAt.plusHours(8).plusMinutes(30);
+
+        assertThatThrownBy(() -> eventService.createEvent(
+                "Long Event", "Desc", EventType.SPA, startAt, endAt, 10, BigDecimal.TEN, "USD", 1L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("cannot exceed 8 hours");
     }
 }

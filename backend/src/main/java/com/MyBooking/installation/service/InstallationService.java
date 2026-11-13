@@ -146,6 +146,9 @@ public class InstallationService {
 
     @Transactional(readOnly = true)
     public boolean canAccommodateParticipants(Long installationId, Integer participants) {
+        if (participants == null || participants < 1) {
+            return false;
+        }
         Installation installation = getInstallationById(installationId);
         return installation.getCapacity() >= participants;
     }
@@ -156,7 +159,8 @@ public class InstallationService {
         if (startDateTime == null || endDateTime == null || !endDateTime.isAfter(startDateTime)) {
             throw new BusinessRuleException("Event end time must be after start time");
         }
-        return installationRepository.findAvailableInstallations(startDateTime, endDateTime, participants, installationType);
+        int minCapacity = (participants != null && participants > 0) ? participants : 1;
+        return installationRepository.findAvailableInstallations(startDateTime, endDateTime, minCapacity, installationType);
     }
 
     @Transactional(readOnly = true)
@@ -312,8 +316,8 @@ public class InstallationService {
             throw new BusinessRuleException("Capacity must be between 1 and 200.");
         }
         
-        if (hourlyRate == null || hourlyRate.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new BusinessRuleException("Hourly rate must be greater than 0.");
+        if (hourlyRate == null || hourlyRate.compareTo(new BigDecimal("0.1")) <= 0) {
+            throw new BusinessRuleException("Hourly rate must be greater than 0.1.");
         }
         
         if (currency == null || currency.length() != 3) {

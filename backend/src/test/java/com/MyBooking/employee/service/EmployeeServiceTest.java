@@ -588,7 +588,7 @@ class EmployeeServiceTest {
         // Given
         LocalDate date = LocalDate.now().plusDays(1);
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
-        when(employeeTrainingRepository.existsOverlappingInProgressTraining(testUser, date, date))
+        when(employeeTrainingRepository.existsOverlappingActiveTraining(testUser, date, date))
             .thenReturn(false);
         when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 testUser, LeaveRequestStatus.APPROVED, date, date))
@@ -600,7 +600,7 @@ class EmployeeServiceTest {
         // Then
         assertThat(result).isTrue();
         verify(employeeRepository).findByUserId(1L);
-        verify(employeeTrainingRepository).existsOverlappingInProgressTraining(testUser, date, date);
+        verify(employeeTrainingRepository).existsOverlappingActiveTraining(testUser, date, date);
         verify(leaveRequestRepository).existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 testUser, LeaveRequestStatus.APPROVED, date, date);
     }
@@ -610,7 +610,7 @@ class EmployeeServiceTest {
         // Given
         LocalDate date = LocalDate.now().plusDays(1);
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
-        when(employeeTrainingRepository.existsOverlappingInProgressTraining(testUser, date, date))
+        when(employeeTrainingRepository.existsOverlappingActiveTraining(testUser, date, date))
             .thenReturn(true);
 
         // When
@@ -619,7 +619,7 @@ class EmployeeServiceTest {
         // Then
         assertThat(result).isFalse();
         verify(employeeRepository).findByUserId(1L);
-        verify(employeeTrainingRepository).existsOverlappingInProgressTraining(testUser, date, date);
+        verify(employeeTrainingRepository).existsOverlappingActiveTraining(testUser, date, date);
     }
 
     @Test
@@ -627,7 +627,7 @@ class EmployeeServiceTest {
         // Given
         LocalDate date = LocalDate.now().plusDays(8); // Within leave period
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
-        when(employeeTrainingRepository.existsOverlappingInProgressTraining(testUser, date, date))
+        when(employeeTrainingRepository.existsOverlappingActiveTraining(testUser, date, date))
             .thenReturn(false);
         when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 testUser, LeaveRequestStatus.APPROVED, date, date))
@@ -639,7 +639,7 @@ class EmployeeServiceTest {
         // Then
         assertThat(result).isFalse();
         verify(employeeRepository).findByUserId(1L);
-        verify(employeeTrainingRepository).existsOverlappingInProgressTraining(testUser, date, date);
+        verify(employeeTrainingRepository).existsOverlappingActiveTraining(testUser, date, date);
         verify(leaveRequestRepository).existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 testUser, LeaveRequestStatus.APPROVED, date, date);
     }
@@ -648,7 +648,7 @@ class EmployeeServiceTest {
     void isEmployeeAvailableForTask_WithActiveEmployee_ShouldReturnTrue() {
         // Given
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
-        when(employeeTrainingRepository.existsOverlappingInProgressTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
+        when(employeeTrainingRepository.existsOverlappingActiveTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
             .thenReturn(false);
 
         // When
@@ -657,7 +657,7 @@ class EmployeeServiceTest {
         // Then
         assertThat(result).isTrue();
         verify(employeeRepository).findByUserId(1L);
-        verify(employeeTrainingRepository).existsOverlappingInProgressTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class));
+        verify(employeeTrainingRepository).existsOverlappingActiveTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class));
     }
 
     @Test
@@ -679,7 +679,7 @@ class EmployeeServiceTest {
     void isEmployeeAvailableForTask_WithApprovedLeave_ShouldReturnFalse() {
         // Given
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
-        when(employeeTrainingRepository.existsOverlappingInProgressTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
+        when(employeeTrainingRepository.existsOverlappingActiveTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
             .thenReturn(false);
         when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 eq(testUser), eq(LeaveRequestStatus.APPROVED), any(LocalDate.class), any(LocalDate.class)))
@@ -704,8 +704,7 @@ class EmployeeServiceTest {
         when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
         when(shiftRepository.findOverlappingShiftsForEmployeeIdExcludingShiftId(startAt, endAt, 1L, 10L))
             .thenReturn(Collections.emptyList());
-        when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
-        when(employeeTrainingRepository.existsOverlappingInProgressTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
+        when(employeeTrainingRepository.existsOverlappingActiveTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
             .thenReturn(false);
         when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 eq(testUser), eq(LeaveRequestStatus.APPROVED), any(LocalDate.class), any(LocalDate.class)))
@@ -786,5 +785,25 @@ class EmployeeServiceTest {
         assertThat(result.get(0)).isEqualTo(testEmployee);
 
         verify(employeeRepository).getEmployeesCreatedInLastDays(any(LocalDateTime.class));
+    }
+
+    @Test
+    void createLeaveRequest_WhenOverlappingOnlyRejectedRequest_ShouldSucceed() {
+        LocalDate fromDate = LocalDate.now().plusDays(10);
+        LocalDate toDate = LocalDate.now().plusDays(12);
+        LeaveRequest rejected = new LeaveRequest(testUser, fromDate, toDate, LeaveRequestStatus.REJECTED, "Old");
+
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
+        when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
+        when(leaveRequestRepository.findOverlappingLeaveRequestsForEmployeeId(1L, fromDate, toDate))
+            .thenReturn(List.of(rejected));
+        when(employeeTrainingRepository.existsOverlappingActiveTraining(testUser, fromDate, toDate))
+            .thenReturn(false);
+        when(leaveRequestRepository.save(any(LeaveRequest.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        LeaveRequest created = employeeService.createLeaveRequest(1L, fromDate, toDate, "Retry");
+
+        assertThat(created).isNotNull();
+        assertThat(created.getStatus()).isEqualTo(LeaveRequestStatus.PENDING);
     }
 }

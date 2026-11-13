@@ -118,6 +118,8 @@ public class EventService {
         // Check installation availability (excluding current event)
         checkInstallationAvailabilityForUpdate(installationId, startAt, endAt, eventId);
         
+        boolean scheduleChanged = !startAt.equals(event.getStartAt()) || !endAt.equals(event.getEndAt());
+
         // Update event
         event.setName(name);
         event.setDescription(description);
@@ -129,7 +131,22 @@ public class EventService {
         event.setCurrency(currency);
         event.setInstallation(installation);
         
-        return eventRepository.save(event);
+        Event savedEvent = eventRepository.save(event);
+
+        if (scheduleChanged) {
+            List<EventBooking> bookings = eventBookingRepository.findByEvent(savedEvent);
+            if (!bookings.isEmpty()) {
+                long durationMinutes = ChronoUnit.MINUTES.between(startAt, endAt);
+                int durationHours = (int) Math.max(1L, (durationMinutes + 59) / 60);
+                for (EventBooking booking : bookings) {
+                    booking.setEventDateTime(startAt);
+                    booking.setDurationHours(durationHours);
+                }
+                eventBookingRepository.saveAll(bookings);
+            }
+        }
+
+        return savedEvent;
     }
 
     /**
@@ -151,12 +168,11 @@ public class EventService {
             throw new BusinessRuleException("Cannot delete events that start within 24 hours");
         }
         
-        // Check if event has existing confirmed bookings via DB count under event lock
-        long confirmedBookings = eventBookingRepository.countByEventIdAndStatus(eventId, EventBookingStatus.CONFIRMED);
-        if (confirmedBookings > 0) {
+        // Check if event has existing bookings of any status (EventBooking.event is non-null FK)
+        if (eventBookingRepository.existsByEventId(eventId)) {
             throw new BusinessRuleException(
-                "Cannot delete event with " + confirmedBookings + " confirmed booking(s). " +
-                "Please cancel all bookings first or contact support for assistance."
+                "Cannot delete event with existing bookings. " +
+                "Please remove or archive bookings first or contact support for assistance."
             );
         }
         
@@ -208,9 +224,9 @@ public class EventService {
             throw new BusinessRuleException("Event end time must be after start time");
         }
         
-        // Duration validation (maximum 8 hours)
-        long durationHours = ChronoUnit.HOURS.between(startAt, endAt);
-        if (durationHours > 8) {
+        // Duration validation (maximum 8 hours = 480 minutes)
+        long durationMinutes = ChronoUnit.MINUTES.between(startAt, endAt);
+        if (durationMinutes > 8 * 60) {
             throw new BusinessRuleException("Event duration cannot exceed 8 hours");
         }
         

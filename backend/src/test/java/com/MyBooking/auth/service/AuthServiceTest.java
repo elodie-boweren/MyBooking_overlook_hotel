@@ -389,4 +389,13 @@ class AuthServiceTest {
         assertThat(result).contains(testUser);
         verify(userRepository).findByRole(Role.CLIENT);
     }
+
+    @Test
+    void registerUser_WithShortPassword_ShouldThrowBusinessRuleException() {
+        assertThatThrownBy(() -> authService.registerUser(
+                "short@example.com", "1234567", "John", "Doe", "1234567890", "Addr",
+                LocalDate.of(1990, 1, 1)))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("at least 8 characters");
+    }
 }

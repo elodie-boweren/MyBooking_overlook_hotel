@@ -239,6 +239,9 @@ public class EmployeeService {
         }
 
         // Validate date range
+        if (fromDate == null || toDate == null) {
+            throw new BusinessRuleException("Leave start date and end date are required");
+        }
         if (fromDate.isAfter(toDate)) {
             throw new BusinessRuleException("Leave start date cannot be after end date");
         }
@@ -247,9 +250,12 @@ public class EmployeeService {
             throw new BusinessRuleException("Leave start date cannot be in the past");
         }
 
-        // Check for overlapping leave requests
+        // Check for overlapping leave requests (REJECTED requests do not block re-submission)
         List<LeaveRequest> overlappingRequests = leaveRequestRepository
-            .findOverlappingLeaveRequestsForEmployeeId(employeeId, fromDate, toDate);
+            .findOverlappingLeaveRequestsForEmployeeId(employeeId, fromDate, toDate)
+            .stream()
+            .filter(lr -> lr.getStatus() != LeaveRequestStatus.REJECTED)
+            .toList();
         
         if (!overlappingRequests.isEmpty()) {
             throw new BusinessRuleException("Employee already has overlapping leave request");
@@ -440,6 +446,9 @@ public class EmployeeService {
      */
     public Training createTraining(String title, LocalDate startDate, LocalDate endDate) {
         // Validate date range
+        if (startDate == null || endDate == null) {
+            throw new BusinessRuleException("Training start date and end date are required");
+        }
         if (startDate.isAfter(endDate)) {
             throw new BusinessRuleException("Training start date cannot be after end date");
         }
@@ -466,6 +475,9 @@ public class EmployeeService {
             .orElseThrow(() -> new NotFoundException("Training not found with ID: " + trainingId));
 
         // Validate date range
+        if (startDate == null || endDate == null) {
+            throw new BusinessRuleException("Training start date and end date are required");
+        }
         if (startDate.isAfter(endDate)) {
             throw new BusinessRuleException("Training start date cannot be after end date");
         }
@@ -592,7 +604,7 @@ public class EmployeeService {
         User employeeUser = employee.getUser();
 
         // Check if employee is in training on this date
-        if (employeeTrainingRepository.existsOverlappingInProgressTraining(employeeUser, date, date)) {
+        if (employeeTrainingRepository.existsOverlappingActiveTraining(employeeUser, date, date)) {
             return false;
         }
 
@@ -616,7 +628,7 @@ public class EmployeeService {
         User employeeUser = employee.getUser();
 
         // Check if employee is in training on this date
-        if (employeeTrainingRepository.existsOverlappingInProgressTraining(employeeUser, date, date)) {
+        if (employeeTrainingRepository.existsOverlappingActiveTraining(employeeUser, date, date)) {
             return false;
         }
 
@@ -667,15 +679,8 @@ public class EmployeeService {
             throw new BusinessRuleException("Employee already has overlapping shift");
         }
 
-        // Check if employee is available for shift across all spanned dates (including overnight shifts)
-        LocalDate currentDate = startAt.toLocalDate();
-        LocalDate endDate = endAt.toLocalDate();
-        while (!currentDate.isAfter(endDate)) {
-            if (!isEmployeeAvailableForShift(employeeId, currentDate)) {
-                throw new BusinessRuleException("Employee is not available for shift on " + currentDate);
-            }
-            currentDate = currentDate.plusDays(1);
-        }
+        // Check if employee is available for shift across the full date range
+        ensureEmployeeAvailableForShiftRange(employee, startAt.toLocalDate(), endAt.toLocalDate());
 
         Shift shift = new Shift(employee.getUser(), startAt, endAt);
         return shiftRepository.save(shift);
@@ -689,7 +694,7 @@ public class EmployeeService {
             .orElseThrow(() -> new NotFoundException("Shift not found with ID: " + shiftId));
 
         // Lock employee record to serialize concurrent shift updates
-        employeeRepository.findByUserIdForUpdate(shift.getEmployee().getId())
+        Employee employee = employeeRepository.findByUserIdForUpdate(shift.getEmployee().getId())
             .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + shift.getEmployee().getId()));
 
         // Validate time range
@@ -710,19 +715,26 @@ public class EmployeeService {
             throw new BusinessRuleException("Employee already has overlapping shift");
         }
 
-        // Check if employee is available for shift across all spanned dates (including overnight shifts)
-        LocalDate currentDate = startAt.toLocalDate();
-        LocalDate endDate = endAt.toLocalDate();
-        while (!currentDate.isAfter(endDate)) {
-            if (!isEmployeeAvailableForShift(shift.getEmployee().getId(), currentDate)) {
-                throw new BusinessRuleException("Employee is not available for shift on " + currentDate);
-            }
-            currentDate = currentDate.plusDays(1);
-        }
+        // Check if employee is available for shift across the full date range
+        ensureEmployeeAvailableForShiftRange(employee, startAt.toLocalDate(), endAt.toLocalDate());
 
         shift.setStartAt(startAt);
         shift.setEndAt(endAt);
         return shiftRepository.save(shift);
+    }
+
+    private void ensureEmployeeAvailableForShiftRange(Employee employee, LocalDate startDate, LocalDate endDate) {
+        if (employee.getStatus() != EmployeeStatus.ACTIVE) {
+            throw new BusinessRuleException("Employee is not active for shift");
+        }
+        User employeeUser = employee.getUser();
+        if (employeeTrainingRepository.existsOverlappingActiveTraining(employeeUser, startDate, endDate)) {
+            throw new BusinessRuleException("Employee has overlapping training during shift period");
+        }
+        if (leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                employeeUser, LeaveRequestStatus.APPROVED, endDate, startDate)) {
+            throw new BusinessRuleException("Employee has approved leave during shift period");
+        }
     }
 
     /**

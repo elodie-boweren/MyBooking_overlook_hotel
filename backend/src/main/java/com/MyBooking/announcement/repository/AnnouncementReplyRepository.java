@@ -5,6 +5,7 @@ import com.MyBooking.announcement.domain.Announcement;
 import com.MyBooking.auth.domain.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,20 +19,28 @@ public interface AnnouncementReplyRepository extends JpaRepository<AnnouncementR
 
     // ==================== BASIC QUERIES ====================
 
+    @Override
+    @EntityGraph(attributePaths = {"user"})
+    Page<AnnouncementReply> findAll(Pageable pageable);
+
     // Find by announcement (entity-based)
     List<AnnouncementReply> findByAnnouncement(Announcement announcement);
+    @EntityGraph(attributePaths = {"user"})
     Page<AnnouncementReply> findByAnnouncement(Announcement announcement, Pageable pageable);
 
     // Find by announcement (ID-based)
     List<AnnouncementReply> findByAnnouncementId(Long announcementId);
+    @EntityGraph(attributePaths = {"user"})
     Page<AnnouncementReply> findByAnnouncementId(Long announcementId, Pageable pageable);
 
     // Find by user (entity-based) - CORRECTED: using 'user' not 'replier'
     List<AnnouncementReply> findByUser(User user);
+    @EntityGraph(attributePaths = {"user"})
     Page<AnnouncementReply> findByUser(User user, Pageable pageable);
 
     // Find by user (ID-based) - CORRECTED: using 'userId' not 'replierId'
     List<AnnouncementReply> findByUserId(Long userId);
+    @EntityGraph(attributePaths = {"user"})
     Page<AnnouncementReply> findByUserId(Long userId, Pageable pageable);
 
     // ==================== DATE-BASED QUERIES ====================
@@ -62,6 +71,7 @@ public interface AnnouncementReplyRepository extends JpaRepository<AnnouncementR
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.createdAt >= :since ORDER BY ar.createdAt DESC")
     List<AnnouncementReply> findRecentReplies(@Param("since") LocalDateTime since);
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.createdAt >= :since ORDER BY ar.createdAt DESC")
     Page<AnnouncementReply> findRecentReplies(@Param("since") LocalDateTime since, Pageable pageable);
 
@@ -69,6 +79,7 @@ public interface AnnouncementReplyRepository extends JpaRepository<AnnouncementR
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.announcement = :announcement ORDER BY ar.createdAt ASC")
     List<AnnouncementReply> findByAnnouncementOrderByCreatedAtAsc(@Param("announcement") Announcement announcement);
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.announcement = :announcement ORDER BY ar.createdAt ASC")
     Page<AnnouncementReply> findByAnnouncementOrderByCreatedAtAsc(@Param("announcement") Announcement announcement, Pageable pageable);
 
@@ -76,6 +87,7 @@ public interface AnnouncementReplyRepository extends JpaRepository<AnnouncementR
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.announcement.id = :announcementId ORDER BY ar.createdAt ASC")
     List<AnnouncementReply> findByAnnouncementIdOrderByCreatedAtAsc(@Param("announcementId") Long announcementId);
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.announcement.id = :announcementId ORDER BY ar.createdAt ASC")
     Page<AnnouncementReply> findByAnnouncementIdOrderByCreatedAtAsc(@Param("announcementId") Long announcementId, Pageable pageable);
 
@@ -83,6 +95,7 @@ public interface AnnouncementReplyRepository extends JpaRepository<AnnouncementR
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.user = :user ORDER BY ar.createdAt DESC")
     List<AnnouncementReply> findByUserOrderByCreatedAtDesc(@Param("user") User user);
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.user = :user ORDER BY ar.createdAt DESC")
     Page<AnnouncementReply> findByUserOrderByCreatedAtDesc(@Param("user") User user, Pageable pageable);
 
@@ -90,6 +103,7 @@ public interface AnnouncementReplyRepository extends JpaRepository<AnnouncementR
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.user.id = :userId ORDER BY ar.createdAt DESC")
     List<AnnouncementReply> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId);
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.user.id = :userId ORDER BY ar.createdAt DESC")
     Page<AnnouncementReply> findByUserIdOrderByCreatedAtDesc(@Param("userId") Long userId, Pageable pageable);
 

@@ -5,6 +5,7 @@ import com.MyBooking.auth.domain.User;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +20,10 @@ import java.util.Optional;
 public interface LoyaltyAccountRepository extends JpaRepository<LoyaltyAccount, Long> {
 
     // ==================== BASIC QUERIES ====================
+
+    @Override
+    @EntityGraph(attributePaths = {"user"})
+    Page<LoyaltyAccount> findAll(Pageable pageable);
 
     // Find by user (entity-based)
     Optional<LoyaltyAccount> findByUser(User user);
@@ -77,6 +82,7 @@ public interface LoyaltyAccountRepository extends JpaRepository<LoyaltyAccount, 
     @Query("SELECT la FROM LoyaltyAccount la WHERE la.balance = 0")
     List<LoyaltyAccount> findAccountsWithZeroBalance();
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT la FROM LoyaltyAccount la WHERE la.balance = 0")
     Page<LoyaltyAccount> findAccountsWithZeroBalance(Pageable pageable);
 
@@ -84,6 +90,7 @@ public interface LoyaltyAccountRepository extends JpaRepository<LoyaltyAccount, 
     @Query("SELECT la FROM LoyaltyAccount la WHERE la.balance >= :threshold ORDER BY la.balance DESC")
     List<LoyaltyAccount> findAccountsWithHighBalance(@Param("threshold") Integer threshold);
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT la FROM LoyaltyAccount la WHERE la.balance >= :threshold ORDER BY la.balance DESC")
     Page<LoyaltyAccount> findAccountsWithHighBalance(@Param("threshold") Integer threshold, Pageable pageable);
 
@@ -91,6 +98,7 @@ public interface LoyaltyAccountRepository extends JpaRepository<LoyaltyAccount, 
     @Query("SELECT la FROM LoyaltyAccount la ORDER BY la.balance DESC")
     List<LoyaltyAccount> findAllOrderByBalanceDesc();
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT la FROM LoyaltyAccount la ORDER BY la.balance DESC")
     Page<LoyaltyAccount> findAllOrderByBalanceDesc(Pageable pageable);
 
@@ -98,6 +106,7 @@ public interface LoyaltyAccountRepository extends JpaRepository<LoyaltyAccount, 
     @Query("SELECT la FROM LoyaltyAccount la ORDER BY la.createdAt DESC")
     List<LoyaltyAccount> findAllOrderByCreatedAtDesc();
 
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT la FROM LoyaltyAccount la ORDER BY la.createdAt DESC")
     Page<LoyaltyAccount> findAllOrderByCreatedAtDesc(Pageable pageable);
 

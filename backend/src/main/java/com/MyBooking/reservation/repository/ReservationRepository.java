@@ -5,6 +5,7 @@ import com.MyBooking.reservation.domain.ReservationStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +20,10 @@ import java.util.Optional;
 
 @Repository
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
+
+    @Override
+    @EntityGraph(attributePaths = {"client", "room"})
+    Page<Reservation> findAll(Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT r FROM Reservation r WHERE r.id = :id")
@@ -41,6 +46,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * @param pageable Pagination information
      * @return Page of reservations for the client
      */
+    @EntityGraph(attributePaths = {"client", "room"})
     Page<Reservation> findByClientId(Long clientId, Pageable pageable);
     
     /**
@@ -86,6 +92,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * @param pageable Pagination information
      * @return Page of reservations for the room
      */
+    @EntityGraph(attributePaths = {"client", "room"})
     Page<Reservation> findByRoomId(Long roomId, Pageable pageable);
     
     /**
@@ -131,6 +138,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * @param pageable Pagination information
      * @return Page of reservations with the status
      */
+    @EntityGraph(attributePaths = {"client", "room"})
     Page<Reservation> findByStatus(ReservationStatus status, Pageable pageable);
     
     /**
@@ -372,6 +380,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * @param pageable Pagination information
      * @return Page of reservations matching the criteria
      */
+    @EntityGraph(attributePaths = {"client", "room"})
     @Query("SELECT r FROM Reservation r WHERE " +
            "(:clientId IS NULL OR r.client.id = :clientId) AND " +
            "(:roomId IS NULL OR r.room.id = :roomId) AND " +

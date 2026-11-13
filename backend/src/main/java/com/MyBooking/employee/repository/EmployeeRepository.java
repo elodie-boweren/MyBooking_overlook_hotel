@@ -254,4 +254,14 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
      */
     @Query("SELECT CASE WHEN COUNT(e) > 0 THEN true ELSE false END FROM Employee e WHERE e.userId = :userId")
     boolean isUserIdEmployee(@Param("userId") Long userId);
+
+    /**
+     * Find employees currently in IN_PROGRESS training covering the given date
+     */
+    @Query("SELECT DISTINCT e FROM Employee e " +
+           "JOIN EmployeeTraining et ON et.employee = e.user " +
+           "JOIN et.training t " +
+           "WHERE et.status = com.MyBooking.employee.domain.TrainingStatus.IN_PROGRESS " +
+           "AND t.startDate <= :date AND t.endDate >= :date")
+    List<Employee> findEmployeesInTrainingOnDate(@Param("date") java.time.LocalDate date);
 }

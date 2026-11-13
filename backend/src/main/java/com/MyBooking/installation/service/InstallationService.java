@@ -248,6 +248,11 @@ public class InstallationService {
     }
 
     @Transactional(readOnly = true)
+    public long getUsedInstallationsCount() {
+        return installationRepository.countUsedInstallations();
+    }
+
+    @Transactional(readOnly = true)
     public List<Installation> getUnusedInstallations() {
         return installationRepository.findUnusedInstallations();
     }

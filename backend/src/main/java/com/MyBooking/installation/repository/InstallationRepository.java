@@ -2,9 +2,11 @@ package com.MyBooking.installation.repository;
 
 import com.MyBooking.installation.domain.Installation;
 import com.MyBooking.installation.domain.InstallationType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,6 +20,10 @@ import java.util.Optional;
 public interface InstallationRepository extends JpaRepository<Installation, Long> {
 
     // ==================== BASIC QUERIES ====================
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT i FROM Installation i WHERE i.id = :id")
+    Optional<Installation> findByIdForUpdate(@Param("id") Long id);
 
     // Find by name (exact match)
     Optional<Installation> findByName(String name);
@@ -220,6 +226,9 @@ public interface InstallationRepository extends JpaRepository<Installation, Long
     List<Installation> findUsedInstallations();
     @Query("SELECT i FROM Installation i WHERE i.events IS NOT EMPTY")
     Page<Installation> findUsedInstallations(Pageable pageable);
+
+    @Query("SELECT COUNT(i) FROM Installation i WHERE i.events IS NOT EMPTY")
+    long countUsedInstallations();
 
     // ==================== CUSTOM QUERIES FOR API RESPONSES ====================
 

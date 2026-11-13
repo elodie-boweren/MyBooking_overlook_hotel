@@ -1,5 +1,6 @@
 package com.MyBooking.announcement.repository;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,21 +20,29 @@ import java.util.List;
 public interface AnnouncementRepository extends JpaRepository<Announcement, Long> {
     
     // ==================== BASIC QUERIES ====================
-    
+
+    @Override
+    @EntityGraph(attributePaths = {"createdBy"})
+    Page<Announcement> findAll(Pageable pageable);
+
     // Find by created by user (entity-based)
     List<Announcement> findByCreatedBy(User createdBy);
+    @EntityGraph(attributePaths = {"createdBy"})
     Page<Announcement> findByCreatedBy(User createdBy, Pageable pageable);
     
     // Find by created by user (ID-based)
     List<Announcement> findByCreatedById(Long createdById);
+    @EntityGraph(attributePaths = {"createdBy"})
     Page<Announcement> findByCreatedById(Long createdById, Pageable pageable);
     
     // Find by priority
     List<Announcement> findByPriority(AnnouncementPriority priority);
+    @EntityGraph(attributePaths = {"createdBy"})
     Page<Announcement> findByPriority(AnnouncementPriority priority, Pageable pageable);
     
     // Find by status
     List<Announcement> findByStatus(AnnouncementStatus status);
+    @EntityGraph(attributePaths = {"createdBy"})
     Page<Announcement> findByStatus(AnnouncementStatus status, Pageable pageable);
     
     // ==================== DATE-BASED QUERIES ====================
@@ -193,6 +202,7 @@ public interface AnnouncementRepository extends JpaRepository<Announcement, Long
 
     // ==================== AUDIENCE SCOPING QUERIES ====================
 
+    @EntityGraph(attributePaths = {"createdBy"})
     @Query("SELECT a FROM Announcement a WHERE a.status = :status " +
            "AND (a.targetDepartment = com.MyBooking.employee.domain.Department.ALL OR a.targetDepartment = :department) " +
            "AND (a.targetRole IS NULL OR a.targetRole = :role) " +
@@ -203,6 +213,7 @@ public interface AnnouncementRepository extends JpaRepository<Announcement, Long
             @Param("status") AnnouncementStatus status,
             Pageable pageable);
 
+    @EntityGraph(attributePaths = {"createdBy"})
     @Query("SELECT a FROM Announcement a WHERE LOWER(a.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
            "OR LOWER(a.content) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
     Page<Announcement> searchByTitleOrContent(@Param("searchTerm") String searchTerm, Pageable pageable);

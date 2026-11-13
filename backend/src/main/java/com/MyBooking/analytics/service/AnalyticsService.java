@@ -169,7 +169,7 @@ public class AnalyticsService {
         
         // Installation utilization
         long totalInstallations = installationService.getTotalInstallationsCount();
-        long usedInstallations = installationService.getMostUsedInstallations().size();
+        long usedInstallations = installationService.getUsedInstallationsCount();
         double installationUtilizationRate = totalInstallations > 0 ? 
             (double) usedInstallations / totalInstallations * 100 : 0.0;
         

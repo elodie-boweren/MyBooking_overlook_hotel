@@ -1,5 +1,6 @@
 package com.MyBooking.feedback.repository;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,13 +18,18 @@ import java.util.Optional;
 public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     
     // ==================== BASIC QUERIES ====================
-    
+
+    @Override
+    @EntityGraph(attributePaths = {"user", "reservation"})
+    Page<Feedback> findAll(Pageable pageable);
+
     // Find by user (entity-based)
     List<Feedback> findByUser(User user);
     Page<Feedback> findByUser(User user, Pageable pageable);
     
     // Find by user (ID-based)
     List<Feedback> findByUserId(Long userId);
+    @EntityGraph(attributePaths = {"user", "reservation"})
     Page<Feedback> findByUserId(Long userId, Pageable pageable);
     
     // Find by reservation (entity-based)
@@ -32,6 +38,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     
     // Find by reservation (ID-based)
     List<Feedback> findByReservationId(Long reservationId);
+    @EntityGraph(attributePaths = {"user", "reservation"})
     Page<Feedback> findByReservationId(Long reservationId, Pageable pageable);
     
     // Find by rating
@@ -40,6 +47,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     
     // Find by rating range
     List<Feedback> findByRatingBetween(Integer minRating, Integer maxRating);
+    @EntityGraph(attributePaths = {"user", "reservation"})
     Page<Feedback> findByRatingBetween(Integer minRating, Integer maxRating, Pageable pageable);
     
     // Find by user and reservation (unique constraint)
@@ -54,6 +62,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     
     // Find by creation date after
     List<Feedback> findByCreatedAtAfter(LocalDateTime date);
+    @EntityGraph(attributePaths = {"user", "reservation"})
     Page<Feedback> findByCreatedAtAfter(LocalDateTime date, Pageable pageable);
     
     // Find by creation date before
@@ -88,6 +97,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     @Query("SELECT f FROM Feedback f WHERE f.createdAt >= :since ORDER BY f.createdAt DESC")
     List<Feedback> findRecentFeedbacks(@Param("since") LocalDateTime since);
     
+    @EntityGraph(attributePaths = {"user", "reservation"})
     @Query("SELECT f FROM Feedback f WHERE f.createdAt >= :since ORDER BY f.createdAt DESC")
     Page<Feedback> findRecentFeedbacks(@Param("since") LocalDateTime since, Pageable pageable);
     
@@ -95,6 +105,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     @Query("SELECT f FROM Feedback f WHERE f.comment IS NOT NULL AND f.comment != ''")
     List<Feedback> findFeedbacksWithComments();
     
+    @EntityGraph(attributePaths = {"user", "reservation"})
     @Query("SELECT f FROM Feedback f WHERE f.comment IS NOT NULL AND f.comment != ''")
     Page<Feedback> findFeedbacksWithComments(Pageable pageable);
     
@@ -102,6 +113,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     @Query("SELECT f FROM Feedback f WHERE f.comment IS NULL OR f.comment = ''")
     List<Feedback> findFeedbacksWithoutComments();
     
+    @EntityGraph(attributePaths = {"user", "reservation"})
     @Query("SELECT f FROM Feedback f WHERE f.comment IS NULL OR f.comment = ''")
     Page<Feedback> findFeedbacksWithoutComments(Pageable pageable);
     
@@ -109,6 +121,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     @Query("SELECT f FROM Feedback f WHERE f.rating >= 4 ORDER BY f.rating DESC, f.createdAt DESC")
     List<Feedback> findHighRatedFeedbacks();
     
+    @EntityGraph(attributePaths = {"user", "reservation"})
     @Query("SELECT f FROM Feedback f WHERE f.rating >= 4 ORDER BY f.rating DESC, f.createdAt DESC")
     Page<Feedback> findHighRatedFeedbacks(Pageable pageable);
     
@@ -116,6 +129,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     @Query("SELECT f FROM Feedback f WHERE f.rating <= 2 ORDER BY f.rating ASC, f.createdAt DESC")
     List<Feedback> findLowRatedFeedbacks();
     
+    @EntityGraph(attributePaths = {"user", "reservation"})
     @Query("SELECT f FROM Feedback f WHERE f.rating <= 2 ORDER BY f.rating ASC, f.createdAt DESC")
     Page<Feedback> findLowRatedFeedbacks(Pageable pageable);
     

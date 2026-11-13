@@ -7,6 +7,7 @@ import com.MyBooking.event.domain.EventBookingStatus;
 import com.MyBooking.reservation.domain.Reservation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,6 +24,10 @@ import java.util.Optional;
  */
 @Repository
 public interface EventBookingRepository extends JpaRepository<EventBooking, Long> {
+
+    @Override
+    @EntityGraph(attributePaths = {"event", "client", "reservation"})
+    Page<EventBooking> findAll(Pageable pageable);
 
     // ==================== BASIC FINDER METHODS ====================
     
@@ -52,6 +57,7 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
      * @param pageable pagination information
      * @return page of bookings for the specified event
      */
+    @EntityGraph(attributePaths = {"event", "client", "reservation"})
     Page<EventBooking> findByEventId(Long eventId, Pageable pageable);
     
     /**
@@ -80,6 +86,7 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
      * @param pageable pagination information
      * @return page of bookings for the specified client
      */
+    @EntityGraph(attributePaths = {"event", "client", "reservation"})
     Page<EventBooking> findByClientId(Long clientId, Pageable pageable);
     
     /**
@@ -117,6 +124,7 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
      * @param pageable pagination information
      * @return page of bookings with the specified status
      */
+    @EntityGraph(attributePaths = {"event", "client", "reservation"})
     Page<EventBooking> findByStatus(EventBookingStatus status, Pageable pageable);
 
     // ==================== DATE AND TIME-BASED QUERIES ====================
@@ -477,6 +485,7 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
      * @param maxDuration maximum duration (optional)
      * @return list of bookings matching the criteria
      */
+    @EntityGraph(attributePaths = {"event", "client", "reservation"})
     @Query("SELECT eb FROM EventBooking eb WHERE " +
            "(:eventId IS NULL OR eb.event.id = :eventId) AND " +
            "(:clientId IS NULL OR eb.client.id = :clientId) AND " +
@@ -513,6 +522,7 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
      * @param pageable pagination information
      * @return page of bookings matching the criteria
      */
+    @EntityGraph(attributePaths = {"event", "client", "reservation"})
     @Query("SELECT eb FROM EventBooking eb WHERE " +
            "(:eventId IS NULL OR eb.event.id = :eventId) AND " +
            "(:clientId IS NULL OR eb.client.id = :clientId) AND " +

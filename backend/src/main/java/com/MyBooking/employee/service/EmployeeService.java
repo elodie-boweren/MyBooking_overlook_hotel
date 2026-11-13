@@ -401,16 +401,7 @@ public class EmployeeService {
      */
     @Transactional(readOnly = true)
     public List<Employee> getEmployeesInTraining(LocalDate date) {
-        List<EmployeeTraining> inProgressTrainings = employeeTrainingRepository.findByStatus(TrainingStatus.IN_PROGRESS);
-        
-        return inProgressTrainings.stream()
-            .filter(training -> {
-                Training t = training.getTraining();
-                return !date.isBefore(t.getStartDate()) && !date.isAfter(t.getEndDate());
-            })
-            .map(training -> employeeRepository.findByUser(training.getEmployee()).orElse(null))
-            .filter(employee -> employee != null)
-            .toList();
+        return employeeRepository.findEmployeesInTrainingOnDate(date);
     }
 
     /**

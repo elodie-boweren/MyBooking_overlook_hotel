@@ -1,5 +1,6 @@
 package com.MyBooking.feedback.repository;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -16,14 +17,22 @@ import java.util.List;
 public interface FeedbackReplyRepository extends JpaRepository<FeedbackReply, Long> {
     
     // ==================== BASIC QUERIES ====================
-    
+
+    @Override
+    @EntityGraph(attributePaths = {"adminUser", "feedback"})
+    Page<FeedbackReply> findAll(Pageable pageable);
+
     // Find by feedback (entity-based)
     List<FeedbackReply> findByFeedback(Feedback feedback);
     Page<FeedbackReply> findByFeedback(Feedback feedback, Pageable pageable);
     
     // Find by feedback (ID-based)
     List<FeedbackReply> findByFeedbackId(Long feedbackId);
+    @EntityGraph(attributePaths = {"adminUser", "feedback"})
     Page<FeedbackReply> findByFeedbackId(Long feedbackId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"adminUser"})
+    List<FeedbackReply> findByFeedbackIdInOrderByCreatedAtAsc(List<Long> feedbackIds);
     
     // Find by admin user (entity-based)
     List<FeedbackReply> findByAdminUser(User adminUser);
@@ -31,6 +40,7 @@ public interface FeedbackReplyRepository extends JpaRepository<FeedbackReply, Lo
     
     // Find by admin user (ID-based)
     List<FeedbackReply> findByAdminUserId(Long adminUserId);
+    @EntityGraph(attributePaths = {"adminUser", "feedback"})
     Page<FeedbackReply> findByAdminUserId(Long adminUserId, Pageable pageable);
     
     // ==================== DATE-BASED QUERIES ====================
@@ -41,6 +51,7 @@ public interface FeedbackReplyRepository extends JpaRepository<FeedbackReply, Lo
     
     // Find by creation date after
     List<FeedbackReply> findByCreatedAtAfter(LocalDateTime date);
+    @EntityGraph(attributePaths = {"adminUser", "feedback"})
     Page<FeedbackReply> findByCreatedAtAfter(LocalDateTime date, Pageable pageable);
     
     // Find by creation date before
@@ -61,6 +72,7 @@ public interface FeedbackReplyRepository extends JpaRepository<FeedbackReply, Lo
     @Query("SELECT fr FROM FeedbackReply fr WHERE fr.createdAt >= :since ORDER BY fr.createdAt DESC")
     List<FeedbackReply> findRecentReplies(@Param("since") LocalDateTime since);
     
+    @EntityGraph(attributePaths = {"adminUser", "feedback"})
     @Query("SELECT fr FROM FeedbackReply fr WHERE fr.createdAt >= :since ORDER BY fr.createdAt DESC")
     Page<FeedbackReply> findRecentReplies(@Param("since") LocalDateTime since, Pageable pageable);
     

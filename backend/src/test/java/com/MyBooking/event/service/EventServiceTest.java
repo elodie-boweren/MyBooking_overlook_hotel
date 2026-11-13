@@ -114,7 +114,7 @@ class EventServiceTest {
     @Test
     void createEvent_WithValidData_ShouldCreateEvent() {
         // Given
-        when(installationRepository.findById(1L)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testInstallation));
         when(eventRepository.existsOverlappingEventForInstallation(1L, testStartTime, testEndTime)).thenReturn(false);
         when(eventRepository.save(any(Event.class))).thenReturn(testEvent);
 
@@ -131,7 +131,7 @@ class EventServiceTest {
         assertThat(result.getCapacity()).isEqualTo(20);
         assertThat(result.getInstallation()).isEqualTo(testInstallation);
 
-        verify(installationRepository).findById(1L);
+        verify(installationRepository).findByIdForUpdate(1L);
         verify(eventRepository).existsOverlappingEventForInstallation(1L, testStartTime, testEndTime);
         verify(eventRepository).save(any(Event.class));
     }
@@ -139,7 +139,7 @@ class EventServiceTest {
     @Test
     void createEvent_WithNonExistentInstallation_ShouldThrowNotFoundException() {
         // Given
-        when(installationRepository.findById(999L)).thenReturn(Optional.empty());
+        when(installationRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> eventService.createEvent(
@@ -148,14 +148,14 @@ class EventServiceTest {
         )).isInstanceOf(NotFoundException.class)
           .hasMessageContaining("Installation not found with ID: 999");
 
-        verify(installationRepository).findById(999L);
+        verify(installationRepository).findByIdForUpdate(999L);
         verify(eventRepository, never()).save(any());
     }
 
     @Test
     void createEvent_WithCapacityExceedingInstallation_ShouldThrowBusinessRuleException() {
         // Given
-        when(installationRepository.findById(1L)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testInstallation));
 
         // When & Then
         assertThatThrownBy(() -> eventService.createEvent(
@@ -164,7 +164,7 @@ class EventServiceTest {
         )).isInstanceOf(BusinessRuleException.class)
           .hasMessageContaining("Event capacity (60) exceeds installation capacity (50)");
 
-        verify(installationRepository).findById(1L);
+        verify(installationRepository).findByIdForUpdate(1L);
         verify(eventRepository, never()).save(any());
     }
 
@@ -207,7 +207,7 @@ class EventServiceTest {
         conflictingEvent.setStartAt(testStartTime.plusMinutes(30));
         conflictingEvent.setEndAt(testEndTime.plusMinutes(30));
 
-        when(installationRepository.findById(1L)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testInstallation));
         when(eventRepository.existsOverlappingEventForInstallation(1L, testStartTime, testEndTime)).thenReturn(true);
 
         // When & Then
@@ -217,7 +217,7 @@ class EventServiceTest {
         )).isInstanceOf(BusinessRuleException.class)
           .hasMessageContaining("Installation is not available for the selected time");
 
-        verify(installationRepository).findById(1L);
+        verify(installationRepository).findByIdForUpdate(1L);
         verify(eventRepository).existsOverlappingEventForInstallation(1L, testStartTime, testEndTime);
         verify(eventRepository, never()).save(any());
     }
@@ -237,7 +237,7 @@ class EventServiceTest {
         updatedEvent.setInstallation(testInstallation);
 
         when(eventRepository.findById(1L)).thenReturn(Optional.of(testEvent));
-        when(installationRepository.findById(1L)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testInstallation));
         when(eventRepository.existsOverlappingEventForInstallationExcludingEvent(
                 1L, testStartTime.plusHours(1), testEndTime.plusHours(1), 1L)).thenReturn(false);
         when(eventRepository.save(any(Event.class))).thenReturn(updatedEvent);
@@ -253,7 +253,7 @@ class EventServiceTest {
         assertThat(result.getCapacity()).isEqualTo(25);
 
         verify(eventRepository).findById(1L);
-        verify(installationRepository).findById(1L);
+        verify(installationRepository).findByIdForUpdate(1L);
         verify(eventRepository).save(any(Event.class));
     }
 

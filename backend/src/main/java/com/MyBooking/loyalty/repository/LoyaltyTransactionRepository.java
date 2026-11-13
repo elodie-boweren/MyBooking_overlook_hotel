@@ -6,6 +6,7 @@ import com.MyBooking.loyalty.domain.LoyaltyTxType;
 import com.MyBooking.reservation.domain.Reservation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -19,12 +20,18 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
 
     // ==================== BASIC QUERIES ====================
 
+    @Override
+    @EntityGraph(attributePaths = {"account", "account.user"})
+    Page<LoyaltyTransaction> findAll(Pageable pageable);
+
     // Find by account (entity-based)
     List<LoyaltyTransaction> findByAccount(LoyaltyAccount account);
+    @EntityGraph(attributePaths = {"account", "account.user"})
     Page<LoyaltyTransaction> findByAccount(LoyaltyAccount account, Pageable pageable);
 
     // Find by account (ID-based)
     List<LoyaltyTransaction> findByAccountId(Long accountId);
+    @EntityGraph(attributePaths = {"account", "account.user"})
     Page<LoyaltyTransaction> findByAccountId(Long accountId, Pageable pageable);
     List<LoyaltyTransaction> findByAccountIdAndCreatedAtAfterOrderByCreatedAtDesc(Long accountId, LocalDateTime since);
 
@@ -106,6 +113,7 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.createdAt >= :since ORDER BY lt.createdAt DESC")
     List<LoyaltyTransaction> findRecentTransactions(@Param("since") LocalDateTime since);
 
+    @EntityGraph(attributePaths = {"account", "account.user"})
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.createdAt >= :since ORDER BY lt.createdAt DESC")
     Page<LoyaltyTransaction> findRecentTransactions(@Param("since") LocalDateTime since, Pageable pageable);
 
@@ -113,6 +121,7 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.account = :account ORDER BY lt.createdAt DESC")
     List<LoyaltyTransaction> findByAccountOrderByCreatedAtDesc(@Param("account") LoyaltyAccount account);
 
+    @EntityGraph(attributePaths = {"account", "account.user"})
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.account = :account ORDER BY lt.createdAt DESC")
     Page<LoyaltyTransaction> findByAccountOrderByCreatedAtDesc(@Param("account") LoyaltyAccount account, Pageable pageable);
 
@@ -120,6 +129,7 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.account.id = :accountId ORDER BY lt.createdAt DESC")
     List<LoyaltyTransaction> findByAccountIdOrderByCreatedAtDesc(@Param("accountId") Long accountId);
 
+    @EntityGraph(attributePaths = {"account", "account.user"})
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.account.id = :accountId ORDER BY lt.createdAt DESC")
     Page<LoyaltyTransaction> findByAccountIdOrderByCreatedAtDesc(@Param("accountId") Long accountId, Pageable pageable);
 
@@ -127,6 +137,7 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.type = :type ORDER BY lt.createdAt DESC")
     List<LoyaltyTransaction> findByTypeOrderByCreatedAtDesc(@Param("type") LoyaltyTxType type);
 
+    @EntityGraph(attributePaths = {"account", "account.user"})
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.type = :type ORDER BY lt.createdAt DESC")
     Page<LoyaltyTransaction> findByTypeOrderByCreatedAtDesc(@Param("type") LoyaltyTxType type, Pageable pageable);
 
@@ -134,6 +145,7 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.points >= :threshold ORDER BY lt.points DESC")
     List<LoyaltyTransaction> findHighValueTransactions(@Param("threshold") Integer threshold);
 
+    @EntityGraph(attributePaths = {"account", "account.user"})
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.points >= :threshold ORDER BY lt.points DESC")
     Page<LoyaltyTransaction> findHighValueTransactions(@Param("threshold") Integer threshold, Pageable pageable);
 
@@ -141,6 +153,7 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.reservation IS NULL")
     List<LoyaltyTransaction> findTransactionsWithoutReservation();
 
+    @EntityGraph(attributePaths = {"account", "account.user"})
     @Query("SELECT lt FROM LoyaltyTransaction lt WHERE lt.reservation IS NULL")
     Page<LoyaltyTransaction> findTransactionsWithoutReservation(Pageable pageable);
 

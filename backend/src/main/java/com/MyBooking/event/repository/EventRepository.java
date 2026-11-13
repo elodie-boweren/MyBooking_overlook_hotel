@@ -6,6 +6,7 @@ import com.MyBooking.installation.domain.Installation;
 import com.MyBooking.installation.domain.InstallationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -508,6 +509,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @param currency currency code (optional)
      * @return list of events matching the criteria
      */
+    @EntityGraph(attributePaths = {"installation"})
     @Query("SELECT e FROM Event e WHERE " +
            "(:name IS NULL OR e.name LIKE %:name%) AND " +
            "(:eventType IS NULL OR e.eventType = :eventType) AND " +
@@ -538,6 +540,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @param pageable pagination information
      * @return page of events matching the criteria
      */
+    @EntityGraph(attributePaths = {"installation"})
     @Query("SELECT e FROM Event e WHERE " +
            "(:name IS NULL OR e.name LIKE %:name%) AND " +
            "(:eventType IS NULL OR e.eventType = :eventType) AND " +
@@ -561,6 +564,11 @@ public interface EventRepository extends JpaRepository<Event, Long> {
 
     List<Event> findByStartAtGreaterThanEqual(LocalDateTime now);
 
+    @Override
+    @EntityGraph(attributePaths = {"installation"})
+    Page<Event> findAll(Pageable pageable);
+
+    @EntityGraph(attributePaths = {"installation"})
     Page<Event> findByStartAtGreaterThanEqual(LocalDateTime now, Pageable pageable);
 
     @Query("SELECT COALESCE(SUM(e.price), 0) FROM Event e WHERE e.currency = :currency")
@@ -569,6 +577,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     @Query("SELECT e FROM Event e WHERE e.installation.installationType = :installationType")
     List<Event> findByInstallationType(@Param("installationType") InstallationType installationType);
 
+    @EntityGraph(attributePaths = {"installation"})
     @Query("SELECT e FROM Event e WHERE e.installation.installationType = :installationType")
     Page<Event> findByInstallationType(@Param("installationType") InstallationType installationType, Pageable pageable);
 

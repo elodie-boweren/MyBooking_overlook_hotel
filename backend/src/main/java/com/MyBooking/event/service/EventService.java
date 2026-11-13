@@ -65,8 +65,8 @@ public class EventService {
         // Validate inputs
         validateEventInputs(name, eventType, startAt, endAt, capacity, price, currency);
         
-        // Get and validate installation
-        Installation installation = installationRepository.findById(installationId)
+        // Get and lock installation to serialize concurrent event scheduling
+        Installation installation = installationRepository.findByIdForUpdate(installationId)
             .orElseThrow(() -> new NotFoundException("Installation not found with ID: " + installationId));
         
         // Validate event capacity against installation capacity
@@ -102,8 +102,8 @@ public class EventService {
         // Validate new inputs
         validateEventInputs(name, eventType, startAt, endAt, capacity, price, currency);
         
-        // Get and validate installation
-        Installation installation = installationRepository.findById(installationId)
+        // Get and lock installation to serialize concurrent event scheduling
+        Installation installation = installationRepository.findByIdForUpdate(installationId)
             .orElseThrow(() -> new NotFoundException("Installation not found with ID: " + installationId));
         
         // Validate event capacity against installation capacity

@@ -185,7 +185,7 @@ class AnalyticsServiceTest {
         when(roomService.getRoomStatistics()).thenReturn(roomStats);
 
         when(installationService.getTotalInstallationsCount()).thenReturn(5L);
-        when(installationService.getMostUsedInstallations()).thenReturn(Collections.emptyList());
+        when(installationService.getUsedInstallationsCount()).thenReturn(0L);
 
         Map<String, Object> metrics = analyticsService.getOccupancyMetrics(start, end);
 
@@ -218,7 +218,7 @@ class AnalyticsServiceTest {
         when(roomService.getRoomStatistics()).thenReturn(roomStats);
 
         when(installationService.getTotalInstallationsCount()).thenReturn(0L);
-        when(installationService.getMostUsedInstallations()).thenReturn(Collections.emptyList());
+        when(installationService.getUsedInstallationsCount()).thenReturn(0L);
 
         Map<String, Object> metrics = analyticsService.getOccupancyMetrics(start, end);
 

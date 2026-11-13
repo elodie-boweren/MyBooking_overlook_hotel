@@ -380,20 +380,17 @@ public class FeedbackService {
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackResponseDto> getAllFeedbacksAsDto(Pageable pageable) {
-        Page<Feedback> feedbacks = getAllFeedbacks(pageable);
-        return feedbacks.map(this::convertToFeedbackResponseDto);
+        return mapFeedbackPageToDto(getAllFeedbacks(pageable));
     }
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackResponseDto> getFeedbacksByUserIdAsDto(Long userId, Pageable pageable) {
-        Page<Feedback> feedbacks = getFeedbacksByUser(userId, pageable);
-        return feedbacks.map(this::convertToFeedbackResponseDto);
+        return mapFeedbackPageToDto(getFeedbacksByUser(userId, pageable));
     }
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackResponseDto> getFeedbacksByReservationIdAsDto(Long reservationId, Pageable pageable) {
-        Page<Feedback> feedbacks = getFeedbacksByReservation(reservationId, pageable);
-        return feedbacks.map(this::convertToFeedbackResponseDto);
+        return mapFeedbackPageToDto(getFeedbacksByReservation(reservationId, pageable));
     }
 
     @Transactional(readOnly = true)
@@ -404,8 +401,7 @@ public class FeedbackService {
         } else if (criteria.getReservationId() != null) {
             return getFeedbacksByReservationIdAsDto(criteria.getReservationId(), pageable);
         } else if (criteria.getMinRating() != null && criteria.getMaxRating() != null) {
-            Page<Feedback> feedbacks = getFeedbacksByRatingRange(criteria.getMinRating(), criteria.getMaxRating(), pageable);
-            return feedbacks.map(this::convertToFeedbackResponseDto);
+            return mapFeedbackPageToDto(getFeedbacksByRatingRange(criteria.getMinRating(), criteria.getMaxRating(), pageable));
         } else {
             return getAllFeedbacksAsDto(pageable);
         }
@@ -424,11 +420,15 @@ public class FeedbackService {
         Double avgRating = feedbackRepository.getAverageRatingOverall();
         stats.setOverallAverageRating(avgRating);
         
-        // Get rating distribution
+        // Get rating distribution in a single GROUP BY query
         java.util.Map<Integer, Long> distribution = new java.util.HashMap<>();
         for (int i = 1; i <= 5; i++) {
-            long count = feedbackRepository.countByRating(i);
-            distribution.put(i, count);
+            distribution.put(i, 0L);
+        }
+        for (Object[] row : feedbackRepository.getRatingDistribution()) {
+            Integer rating = ((Number) row[0]).intValue();
+            Long count = ((Number) row[1]).longValue();
+            distribution.put(rating, count);
         }
         stats.setRatingDistribution(distribution);
         
@@ -448,53 +448,28 @@ public class FeedbackService {
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackResponseDto> getHighRatedFeedbacksAsDto(Pageable pageable) {
-        List<Feedback> feedbacks = getHighRatedFeedbacks();
-        // Convert to page - this is a simplified implementation
-        return new org.springframework.data.domain.PageImpl<>(
-            feedbacks.stream().map(this::convertToFeedbackResponseDto).collect(java.util.stream.Collectors.toList()),
-            pageable,
-            feedbacks.size()
-        );
+        return mapFeedbackPageToDto(feedbackRepository.findHighRatedFeedbacks(pageable));
     }
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackResponseDto> getLowRatedFeedbacksAsDto(Pageable pageable) {
-        List<Feedback> feedbacks = getLowRatedFeedbacks();
-        return new org.springframework.data.domain.PageImpl<>(
-            feedbacks.stream().map(this::convertToFeedbackResponseDto).collect(java.util.stream.Collectors.toList()),
-            pageable,
-            feedbacks.size()
-        );
+        return mapFeedbackPageToDto(feedbackRepository.findLowRatedFeedbacks(pageable));
     }
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackResponseDto> getFeedbacksWithCommentsAsDto(Pageable pageable) {
-        List<Feedback> feedbacks = getFeedbacksWithComments();
-        return new org.springframework.data.domain.PageImpl<>(
-            feedbacks.stream().map(this::convertToFeedbackResponseDto).collect(java.util.stream.Collectors.toList()),
-            pageable,
-            feedbacks.size()
-        );
+        return mapFeedbackPageToDto(feedbackRepository.findFeedbacksWithComments(pageable));
     }
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackResponseDto> getFeedbacksWithoutCommentsAsDto(Pageable pageable) {
-        List<Feedback> feedbacks = getFeedbacksWithoutComments();
-        return new org.springframework.data.domain.PageImpl<>(
-            feedbacks.stream().map(this::convertToFeedbackResponseDto).collect(java.util.stream.Collectors.toList()),
-            pageable,
-            feedbacks.size()
-        );
+        return mapFeedbackPageToDto(feedbackRepository.findFeedbacksWithoutComments(pageable));
     }
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackResponseDto> getRecentFeedbacksAsDto(int days, Pageable pageable) {
-        List<Feedback> feedbacks = getRecentFeedbacks(days);
-        return new org.springframework.data.domain.PageImpl<>(
-            feedbacks.stream().map(this::convertToFeedbackResponseDto).collect(java.util.stream.Collectors.toList()),
-            pageable,
-            feedbacks.size()
-        );
+        LocalDateTime since = LocalDateTime.now().minusDays(days);
+        return mapFeedbackPageToDto(feedbackRepository.findRecentFeedbacks(since, pageable));
     }
 
     // Feedback Reply DTO methods
@@ -519,12 +494,8 @@ public class FeedbackService {
 
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackReplyResponseDto> getFeedbackRepliesByFeedbackIdAsDto(Long feedbackId, Pageable pageable) {
-        List<FeedbackReply> replies = getRepliesForFeedback(feedbackId);
-        return new org.springframework.data.domain.PageImpl<>(
-            replies.stream().map(this::convertToFeedbackReplyResponseDto).collect(java.util.stream.Collectors.toList()),
-            pageable,
-            replies.size()
-        );
+        return feedbackReplyRepository.findByFeedbackId(feedbackId, pageable)
+                .map(this::convertToFeedbackReplyResponseDto);
     }
 
     @Transactional(readOnly = true)
@@ -542,12 +513,8 @@ public class FeedbackService {
     @Transactional(readOnly = true)
     public Page<com.MyBooking.feedback.dto.FeedbackReplyResponseDto> getRecentFeedbackRepliesAsDto(int days, Pageable pageable) {
         LocalDateTime since = LocalDateTime.now().minusDays(days);
-        List<FeedbackReply> replies = feedbackReplyRepository.findRecentReplies(since);
-        return new org.springframework.data.domain.PageImpl<>(
-            replies.stream().map(this::convertToFeedbackReplyResponseDto).collect(java.util.stream.Collectors.toList()),
-            pageable,
-            replies.size()
-        );
+        return feedbackReplyRepository.findRecentReplies(since, pageable)
+                .map(this::convertToFeedbackReplyResponseDto);
     }
 
     // Utility method to get user ID by email (legacy helper - use UserPrincipal.getId() instead)
@@ -560,7 +527,25 @@ public class FeedbackService {
     }
 
     // Conversion methods
+    private Page<com.MyBooking.feedback.dto.FeedbackResponseDto> mapFeedbackPageToDto(Page<Feedback> feedbackPage) {
+        List<Long> feedbackIds = feedbackPage.getContent().stream()
+                .map(Feedback::getId)
+                .toList();
+        java.util.Map<Long, List<FeedbackReply>> repliesByFeedbackId = feedbackIds.isEmpty()
+                ? java.util.Map.of()
+                : feedbackReplyRepository.findByFeedbackIdInOrderByCreatedAtAsc(feedbackIds).stream()
+                        .collect(java.util.stream.Collectors.groupingBy(reply -> reply.getFeedback().getId()));
+        return feedbackPage.map(feedback -> convertToFeedbackResponseDto(
+                feedback,
+                repliesByFeedbackId.getOrDefault(feedback.getId(), List.of())
+        ));
+    }
+
     private com.MyBooking.feedback.dto.FeedbackResponseDto convertToFeedbackResponseDto(Feedback feedback) {
+        return convertToFeedbackResponseDto(feedback, getRepliesForFeedback(feedback.getId()));
+    }
+
+    private com.MyBooking.feedback.dto.FeedbackResponseDto convertToFeedbackResponseDto(Feedback feedback, List<FeedbackReply> replies) {
         com.MyBooking.feedback.dto.FeedbackResponseDto dto = new com.MyBooking.feedback.dto.FeedbackResponseDto();
         dto.setId(feedback.getId());
         dto.setReservationId(feedback.getReservation().getId());
@@ -573,8 +558,6 @@ public class FeedbackService {
         dto.setCreatedAt(feedback.getCreatedAt());
         dto.setUpdatedAt(feedback.getUpdatedAt());
         
-        // Get replies for this feedback
-        List<FeedbackReply> replies = getRepliesForFeedback(feedback.getId());
         List<com.MyBooking.feedback.dto.FeedbackReplyResponseDto> replyDtos = replies.stream()
                 .map(this::convertToFeedbackReplyResponseDto)
                 .collect(java.util.stream.Collectors.toList());

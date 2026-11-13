@@ -114,26 +114,10 @@ public class ReservationService {
                                                  LocalDate checkOut, Integer numberOfGuests, 
                                                  String currency, Integer pointsToRedeem) {
         // Validate inputs
-        if (clientId == null || roomId == null || checkIn == null || checkOut == null || 
-            numberOfGuests == null || currency == null) {
+        if (clientId == null || roomId == null) {
             throw new BusinessRuleException("All reservation parameters are required");
         }
-
-        if (checkIn.isBefore(LocalDate.now())) {
-            throw new BusinessRuleException("Check-in date cannot be in the past");
-        }
-
-        if (checkOut.isBefore(checkIn) || checkOut.isEqual(checkIn)) {
-            throw new BusinessRuleException("Check-out date must be after check-in date");
-        }
-
-        if (numberOfGuests < 1 || numberOfGuests > 10) {
-            throw new BusinessRuleException("Number of guests must be between 1 and 10");
-        }
-
-        if (currency.length() != 3) {
-            throw new BusinessRuleException("Currency must be exactly 3 characters");
-        }
+        validateReservationInputs(checkIn, checkOut, numberOfGuests, currency);
 
         // Get and validate room with pessimistic write lock to serialize concurrent bookings
         Room room = roomRepository.findByIdForUpdate(roomId)
@@ -262,7 +246,10 @@ public class ReservationService {
      */
     private void validateReservationInputs(LocalDate checkIn, LocalDate checkOut, 
                                          Integer numberOfGuests, String currency) {
-        
+        if (checkIn == null || checkOut == null || numberOfGuests == null || currency == null) {
+            throw new BusinessRuleException("All reservation parameters are required");
+        }
+
         LocalDate today = LocalDate.now();
         
         // Check-in date validation
@@ -353,13 +340,25 @@ public class ReservationService {
 
     // ========== UPDATE & CANCEL OPERATIONS ==========
 
+    private BigDecimal applyPointsDiscount(BigDecimal basePrice, Reservation reservation) {
+        if (reservation.getPointsUsed() != null && reservation.getPointsUsed() > 0
+                && reservation.getPointsDiscount() != null) {
+            return basePrice.subtract(reservation.getPointsDiscount()).max(BigDecimal.ZERO);
+        }
+        return basePrice;
+    }
+
     /**
      * Update an existing reservation
      */
     public Reservation updateReservation(Long reservationId, LocalDate newCheckIn, LocalDate newCheckOut, 
                                        Integer newNumberOfGuests, String currency) {
         
-        Reservation reservation = getReservationById(reservationId);
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
+            .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + reservationId));
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new BusinessRuleException("Cannot update a cancelled reservation");
+        }
         
         // Validate new inputs
         validateReservationInputs(newCheckIn, newCheckOut, newNumberOfGuests, currency);
@@ -368,8 +367,9 @@ public class ReservationService {
         Room room = roomRepository.findByIdForUpdate(reservation.getRoom().getId())
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + reservation.getRoom().getId()));
         
-        // Validate room capacity for new guest count
+        // Validate room capacity and operational status
         validateRoomCapacity(room, newNumberOfGuests);
+        validateRoomOperationalStatus(room);
         
         // Check availability for new dates (excluding current reservation)
         checkRoomAvailabilityForUpdate(room.getId(), newCheckIn, newCheckOut, reservationId);
@@ -380,9 +380,9 @@ public class ReservationService {
         reservation.setNumberOfGuests(newNumberOfGuests);
         reservation.setCurrency(currency);
         
-        // Recalculate price
-        BigDecimal newTotalPrice = calculateTotalPrice(reservation.getRoom(), newCheckIn, newCheckOut, newNumberOfGuests);
-        reservation.setTotalPrice(newTotalPrice);
+        // Recalculate price while preserving any loyalty points discount
+        BigDecimal basePrice = calculateTotalPrice(room, newCheckIn, newCheckOut, newNumberOfGuests);
+        reservation.setTotalPrice(applyPointsDiscount(basePrice, reservation));
         
         return reservationRepository.save(reservation);
     }
@@ -759,7 +759,11 @@ public class ReservationService {
      * Reassign reservation to different room
      */
     public ReservationResponseDto reassignReservation(Long id, Long newRoomId) {
-        Reservation reservation = getReservationById(id);
+        Reservation reservation = reservationRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + id));
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            throw new BusinessRuleException("Cannot reassign a cancelled reservation");
+        }
         
         // Validate new room with pessimistic write lock
         Room newRoom = roomRepository.findByIdForUpdate(newRoomId)
@@ -772,8 +776,10 @@ public class ReservationService {
         // Check if new room is available for the reservation dates
         checkRoomAvailabilityForUpdate(newRoomId, reservation.getCheckIn(), reservation.getCheckOut(), id);
         
-        // Update reservation
+        // Update reservation and recalculate price for the new room
         reservation.setRoom(newRoom);
+        BigDecimal basePrice = calculateTotalPrice(newRoom, reservation.getCheckIn(), reservation.getCheckOut(), reservation.getNumberOfGuests());
+        reservation.setTotalPrice(applyPointsDiscount(basePrice, reservation));
         Reservation updatedReservation = reservationRepository.save(reservation);
         
         return convertToResponseDto(updatedReservation);

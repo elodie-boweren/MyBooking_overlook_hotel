@@ -284,6 +284,11 @@ public class AnnouncementService {
 
     // ==================== STATISTICS AND ANALYTICS ====================
 
+    @Transactional(readOnly = true)
+    public long getTotalAnnouncementsCount() {
+        return announcementRepository.count();
+    }
+
     /**
      * Get announcement statistics
      */

@@ -347,7 +347,12 @@ public class LoyaltyService {
      */
     private LoyaltyAccount getOrCreateLoyaltyAccount(Long userId) {
         return loyaltyAccountRepository.findByUserId(userId)
-            .orElseGet(() -> createLoyaltyAccount(userId));
+            .orElseGet(() -> {
+                userRepository.findByIdForUpdate(userId)
+                    .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+                return loyaltyAccountRepository.findByUserId(userId)
+                    .orElseGet(() -> createLoyaltyAccount(userId));
+            });
     }
 
     // ========== ADMIN OPERATIONS ==========
@@ -447,6 +452,7 @@ public class LoyaltyService {
     /**
      * Process points for a confirmed reservation
      */
+    @Transactional(noRollbackFor = RuntimeException.class)
     public LoyaltyTransaction processReservationPoints(Long reservationId) {
         Reservation reservation = reservationRepository.findById(reservationId)
             .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + reservationId));

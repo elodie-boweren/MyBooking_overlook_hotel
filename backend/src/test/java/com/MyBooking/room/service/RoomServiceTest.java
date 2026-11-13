@@ -223,8 +223,8 @@ class RoomServiceTest {
         LocalDate checkOut = LocalDate.now().plusDays(3);
         
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
-        when(reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut))
-            .thenReturn(Arrays.asList());
+        when(reservationRepository.countConflictingReservations(roomId, checkIn, checkOut))
+            .thenReturn(0L);
         
         // When
         boolean result = roomService.isRoomAvailable(roomId, checkIn, checkOut);
@@ -232,7 +232,7 @@ class RoomServiceTest {
         // Then
         assertThat(result).isTrue();
         verify(roomRepository).findById(roomId);
-        verify(reservationRepository).checkRoomAvailability(roomId, checkIn, checkOut);
+        verify(reservationRepository).countConflictingReservations(roomId, checkIn, checkOut);
     }
     
     @Test
@@ -251,7 +251,7 @@ class RoomServiceTest {
         // Then
         assertThat(result).isFalse();
         verify(roomRepository).findById(roomId);
-        verify(reservationRepository, never()).checkRoomAvailability(anyLong(), any(), any());
+        verify(reservationRepository, never()).countConflictingReservations(anyLong(), any(), any());
     }
 
     @Test
@@ -263,8 +263,8 @@ class RoomServiceTest {
         LocalDate checkOut = LocalDate.now().plusDays(10);
         
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
-        when(reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut))
-            .thenReturn(List.of());
+        when(reservationRepository.countConflictingReservations(roomId, checkIn, checkOut))
+            .thenReturn(0L);
         
         // When
         boolean result = roomService.isRoomAvailable(roomId, checkIn, checkOut);
@@ -272,7 +272,7 @@ class RoomServiceTest {
         // Then - Decoupled dynamic availability allows booking
         assertThat(result).isTrue();
         verify(roomRepository).findById(roomId);
-        verify(reservationRepository).checkRoomAvailability(roomId, checkIn, checkOut);
+        verify(reservationRepository).countConflictingReservations(roomId, checkIn, checkOut);
     }
     
     @Test
@@ -282,10 +282,9 @@ class RoomServiceTest {
         LocalDate checkIn = LocalDate.now().plusDays(1);
         LocalDate checkOut = LocalDate.now().plusDays(3);
         
-        Reservation overlappingReservation = new Reservation();
         when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
-        when(reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut))
-            .thenReturn(Arrays.asList(overlappingReservation));
+        when(reservationRepository.countConflictingReservations(roomId, checkIn, checkOut))
+            .thenReturn(1L);
         
         // When
         boolean result = roomService.isRoomAvailable(roomId, checkIn, checkOut);
@@ -293,7 +292,7 @@ class RoomServiceTest {
         // Then
         assertThat(result).isFalse();
         verify(roomRepository).findById(roomId);
-        verify(reservationRepository).checkRoomAvailability(roomId, checkIn, checkOut);
+        verify(reservationRepository).countConflictingReservations(roomId, checkIn, checkOut);
     }
 
     // ========== ROOM STATUS MANAGEMENT TESTS ==========
@@ -478,7 +477,7 @@ class RoomServiceTest {
         String caption = "Room view";
         boolean isPrimary = true;
         
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
         when(roomPhotoRepository.findByRoomAndIsPrimaryTrue(testRoom)).thenReturn(Optional.empty());
         when(roomPhotoRepository.save(any(RoomPhoto.class))).thenReturn(testPhoto);
         
@@ -487,7 +486,7 @@ class RoomServiceTest {
         
         // Then
         assertThat(result).isNotNull();
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomPhotoRepository).save(any(RoomPhoto.class));
     }
     
@@ -499,6 +498,7 @@ class RoomServiceTest {
         existingPrimary.setIsPrimary(true);
         
         when(roomPhotoRepository.findById(photoId)).thenReturn(Optional.of(testPhoto));
+        when(roomRepository.findByIdForUpdate(testRoom.getId())).thenReturn(Optional.of(testRoom));
         when(roomPhotoRepository.findByRoomAndIsPrimaryTrue(testRoom)).thenReturn(Optional.of(existingPrimary));
         when(roomPhotoRepository.save(any(RoomPhoto.class))).thenReturn(testPhoto);
         

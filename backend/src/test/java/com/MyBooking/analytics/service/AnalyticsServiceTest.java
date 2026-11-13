@@ -228,4 +228,60 @@ class AnalyticsServiceTest {
         assertThat((BigDecimal) metrics.get("adr")).isEqualByComparingTo(BigDecimal.ZERO);
         assertThat((BigDecimal) metrics.get("revPar")).isEqualByComparingTo(BigDecimal.ZERO);
     }
+
+    @Test
+    void getRevenueTrends_ShouldQueryFromFirstDayOfEachMonth() {
+        when(reservationService.getOverlappingReservationsInDateRange(
+                any(LocalDate.class), any(LocalDate.class), eq(ReservationStatus.CONFIRMED)))
+            .thenReturn(Collections.emptyList());
+        when(eventService.getTotalEventRevenueBetweenDates(any(LocalDateTime.class), any(LocalDateTime.class)))
+            .thenReturn(BigDecimal.ZERO);
+
+        Map<String, Object> trends = analyticsService.getRevenueTrends(2);
+        assertThat(trends.get("monthlyRevenue")).asList().hasSize(2);
+
+        LocalDate expectedFirstMonthStart = LocalDate.now().withDayOfMonth(1).minusMonths(1);
+        org.mockito.Mockito.verify(reservationService).getOverlappingReservationsInDateRange(
+            expectedFirstMonthStart,
+            expectedFirstMonthStart.withDayOfMonth(expectedFirstMonthStart.lengthOfMonth()),
+            ReservationStatus.CONFIRMED
+        );
+    }
+
+    @Test
+    void getOperationalKPIs_ShouldReturnRealServiceMetricsAndNotPlaceholders() {
+        RoomService.RoomStatistics roomStats = new RoomService.RoomStatistics(10L, 6L, 3L, 1L);
+        when(roomService.getRoomStatistics()).thenReturn(roomStats);
+        when(installationService.getTotalInstallationsCount()).thenReturn(4L);
+        when(installationService.getUsedInstallationsCount()).thenReturn(2L);
+        when(authService.countUsersByRole(Role.CLIENT)).thenReturn(20L);
+        when(reservationService.getOverlappingReservationsInDateRange(
+                any(LocalDate.class), any(LocalDate.class), eq(ReservationStatus.CONFIRMED)))
+            .thenReturn(Collections.emptyList());
+
+        com.MyBooking.employee.dto.EmployeeStatisticsDto empStats =
+            new com.MyBooking.employee.dto.EmployeeStatisticsDto(8L, 6L, 2L, 1L, 3L, 1L, 2L);
+        when(employeeService.getEmployeeStatisticsAsDto()).thenReturn(empStats);
+
+        com.MyBooking.reservation.service.ReservationService.ReservationStatistics resStats =
+            new com.MyBooking.reservation.service.ReservationService.ReservationStatistics(
+                12L, 10L, 2L, new BigDecimal("1200"), new BigDecimal("120"));
+        when(reservationService.getReservationStatistics()).thenReturn(resStats);
+
+        com.MyBooking.event.service.EventService.EventStatistics eventStats =
+            new com.MyBooking.event.service.EventService.EventStatistics(7L, 5L, 2L, new BigDecimal("700"), new BigDecimal("100"));
+        when(eventService.getEventStatistics()).thenReturn(eventStats);
+
+        when(announcementService.getTotalAnnouncementsCount()).thenReturn(3L);
+        when(feedbackService.getFeedbackStatistics()).thenReturn(
+            new com.MyBooking.feedback.dto.FeedbackStatisticsDto(4.5, 9L, Collections.emptyMap(), 7L, 1L, 8L, 1L));
+
+        Map<String, Object> kpis = analyticsService.getOperationalKPIs();
+        @SuppressWarnings("unchecked")
+        Map<String, Object> serviceMetrics = (Map<String, Object>) kpis.get("serviceMetrics");
+        assertThat(serviceMetrics.get("totalReservations")).isEqualTo(12L);
+        assertThat(serviceMetrics.get("totalEvents")).isEqualTo(7L);
+        assertThat(serviceMetrics.get("totalAnnouncements")).isEqualTo(3L);
+        assertThat(serviceMetrics.get("totalFeedbacks")).isEqualTo(9L);
+    }
 }

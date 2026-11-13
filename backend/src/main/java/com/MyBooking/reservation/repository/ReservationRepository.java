@@ -438,6 +438,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     /**
      * Search method for client reservations with date range - handles null dates properly
      */
+    @EntityGraph(attributePaths = {"client", "room"})
     @Query("SELECT r FROM Reservation r WHERE r.client.id = :clientId AND r.checkIn >= :checkInFrom AND r.checkIn <= :checkInTo")
     Page<Reservation> findByClientIdAndDateRange(@Param("clientId") Long clientId,
                                                  @Param("checkInFrom") LocalDate checkInFrom,

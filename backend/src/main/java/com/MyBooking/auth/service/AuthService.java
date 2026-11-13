@@ -170,9 +170,11 @@ public class AuthService {
     public NotificationPreference updateNotificationPreference(String email, String notificationType, 
                                                               Boolean emailEnabled, Boolean smsEnabled, Boolean pushEnabled) {
         User user = getUserProfile(email);
+        User lockedUser = userRepository.findByIdForUpdate(user.getId())
+            .orElseThrow(() -> new NotFoundException("User not found with ID: " + user.getId()));
         
         Optional<NotificationPreference> existing = notificationPreferenceRepository
-            .findByUserAndNotificationType(user, notificationType);
+            .findByUserAndNotificationType(lockedUser, notificationType);
         
         if (existing.isPresent()) {
             NotificationPreference preference = existing.get();
@@ -181,7 +183,7 @@ public class AuthService {
             preference.setPushEnabled(pushEnabled);
             return notificationPreferenceRepository.save(preference);
         } else {
-            NotificationPreference preference = new NotificationPreference(user, notificationType, emailEnabled, smsEnabled, pushEnabled);
+            NotificationPreference preference = new NotificationPreference(lockedUser, notificationType, emailEnabled, smsEnabled, pushEnabled);
             return notificationPreferenceRepository.save(preference);
         }
     }
@@ -193,6 +195,14 @@ public class AuthService {
     @Transactional(readOnly = true)
     public List<User> getAllUsers() {
         return userRepository.findAll();
+    }
+
+    /**
+     * Get all users with pagination (Admin only)
+     */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<User> getAllUsers(org.springframework.data.domain.Pageable pageable) {
+        return userRepository.findAll(pageable);
     }
 
     /**
@@ -244,6 +254,10 @@ public class AuthService {
         // Create default notification preferences
         createDefaultNotificationPreferences(savedUser);
         
+        if (role == Role.EMPLOYEE) {
+            createEmployeeRecord(savedUser);
+        }
+        
         return savedUser;
     }
 
@@ -269,7 +283,11 @@ public class AuthService {
         user.setBirthDate(birthDate);
         user.setRole(role);
         
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        if (role == Role.EMPLOYEE) {
+            createEmployeeRecord(savedUser);
+        }
+        return savedUser;
     }
 
     private String normalizeEmail(String email) {

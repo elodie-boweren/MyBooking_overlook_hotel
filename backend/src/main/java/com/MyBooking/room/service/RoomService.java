@@ -51,6 +51,9 @@ public class RoomService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired(required = false)
+    private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+
     // ========== ROOM MANAGEMENT ==========
 
     /**
@@ -58,6 +61,12 @@ public class RoomService {
      */
     public Room createRoom(String number, RoomType roomType, BigDecimal price, 
                           String currency, Integer capacity, String description) {
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Room price must be greater than 0");
+        }
+        if (capacity == null || capacity < 1) {
+            throw new BusinessRuleException("Room capacity must be at least 1");
+        }
         // Validate room number uniqueness
         if (roomRepository.existsByNumber(number)) {
             throw new BusinessRuleException("Room number already exists: " + number);
@@ -153,11 +162,8 @@ public class RoomService {
             return false;
         }
         
-        // Check for overlapping reservations
-        List<Reservation> overlappingReservations = reservationRepository
-            .checkRoomAvailability(roomId, checkIn, checkOut);
-        
-        return overlappingReservations.isEmpty();
+        // Check for overlapping reservations using aggregate count
+        return reservationRepository.countConflictingReservations(roomId, checkIn, checkOut) == 0;
     }
 
     /**
@@ -353,7 +359,8 @@ public class RoomService {
      * Add photo to room
      */
     public RoomPhoto addRoomPhoto(Long roomId, String imageUrl, String caption, boolean isPrimary) {
-        Room room = getRoomById(roomId);
+        Room room = roomRepository.findByIdForUpdate(roomId)
+            .orElseThrow(() -> new NotFoundException("Room not found with ID: " + roomId));
         
         // If this is set as primary, unset other primary photos
         if (isPrimary) {
@@ -392,9 +399,13 @@ public class RoomService {
     public RoomPhoto setPrimaryPhoto(Long photoId) {
         RoomPhoto photo = roomPhotoRepository.findById(photoId)
             .orElseThrow(() -> new NotFoundException("Photo not found with ID: " + photoId));
+
+        // Lock room to serialize primary photo transitions
+        Room lockedRoom = roomRepository.findByIdForUpdate(photo.getRoom().getId())
+            .orElseThrow(() -> new NotFoundException("Room not found with ID: " + photo.getRoom().getId()));
         
         // Unset other primary photos for this room
-        Optional<RoomPhoto> existingPrimary = roomPhotoRepository.findByRoomAndIsPrimaryTrue(photo.getRoom());
+        Optional<RoomPhoto> existingPrimary = roomPhotoRepository.findByRoomAndIsPrimaryTrue(lockedRoom);
         if (existingPrimary.isPresent()) {
             RoomPhoto primaryPhoto = existingPrimary.get();
             primaryPhoto.setIsPrimary(false);
@@ -543,9 +554,14 @@ public class RoomService {
         newSystemUser.setAddress("Hotel System"); // System user address
         newSystemUser.setBirthDate(java.time.LocalDate.of(2000, 1, 1)); // System user birth date
         newSystemUser.setRole(Role.ADMIN);
-        newSystemUser.setPassword("SystemUser123@"); // Valid password for system user
+        String rawPassword = java.util.UUID.randomUUID().toString();
+        newSystemUser.setPassword(passwordEncoder != null ? passwordEncoder.encode(rawPassword) : rawPassword);
         
-        return userRepository.save(newSystemUser);
+        try {
+            return userRepository.save(newSystemUser);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            return userRepository.findByEmail("system@hotel.com").orElseThrow(() -> ex);
+        }
     }
 
     // ========== INNER CLASSES ==========

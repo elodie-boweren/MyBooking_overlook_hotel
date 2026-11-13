@@ -333,8 +333,9 @@ public class EmployeeService {
      * Assign training to an employee
      */
     public EmployeeTraining assignTraining(Long employeeId, Long trainingId) {
-        // Validate employee exists and is active
-        Employee employee = getEmployeeByUserId(employeeId);
+        // Validate employee exists and is active (with pessimistic lock to serialize concurrent training assignments)
+        Employee employee = employeeRepository.findByUserIdForUpdate(employeeId)
+            .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + employeeId));
         if (employee.getStatus() != EmployeeStatus.ACTIVE) {
             throw new BusinessRuleException("Cannot assign training to inactive employee");
         }
@@ -346,6 +347,15 @@ public class EmployeeService {
         // Check for overlapping training
         if (hasOverlappingTraining(employeeId, training.getStartDate(), training.getEndDate())) {
             throw new BusinessRuleException("Employee already has overlapping training");
+        }
+
+        // Check for overlapping approved leave
+        boolean hasApprovedLeave = leaveRequestRepository
+            .findOverlappingLeaveRequestsForEmployeeId(employeeId, training.getStartDate(), training.getEndDate())
+            .stream()
+            .anyMatch(lr -> lr.getStatus() == LeaveRequestStatus.APPROVED);
+        if (hasApprovedLeave) {
+            throw new BusinessRuleException("Employee has approved leave overlapping with training dates");
         }
 
         // Check if employee is already assigned to this training
@@ -629,10 +639,14 @@ public class EmployeeService {
             throw new BusinessRuleException("Employee already has overlapping shift");
         }
 
-        // Check if employee is available for shift on the shift date
-        LocalDate shiftDate = startAt.toLocalDate();
-        if (!isEmployeeAvailableForShift(employeeId, shiftDate)) {
-            throw new BusinessRuleException("Employee is not available for shift on " + shiftDate);
+        // Check if employee is available for shift across all spanned dates (including overnight shifts)
+        LocalDate currentDate = startAt.toLocalDate();
+        LocalDate endDate = endAt.toLocalDate();
+        while (!currentDate.isAfter(endDate)) {
+            if (!isEmployeeAvailableForShift(employeeId, currentDate)) {
+                throw new BusinessRuleException("Employee is not available for shift on " + currentDate);
+            }
+            currentDate = currentDate.plusDays(1);
         }
 
         Shift shift = new Shift(employee.getUser(), startAt, endAt);
@@ -662,10 +676,14 @@ public class EmployeeService {
             throw new BusinessRuleException("Employee already has overlapping shift");
         }
 
-        // Check if employee is available for shift on the new shift date
-        LocalDate shiftDate = startAt.toLocalDate();
-        if (!isEmployeeAvailableForShift(shift.getEmployee().getId(), shiftDate)) {
-            throw new BusinessRuleException("Employee is not available for shift on " + shiftDate);
+        // Check if employee is available for shift across all spanned dates (including overnight shifts)
+        LocalDate currentDate = startAt.toLocalDate();
+        LocalDate endDate = endAt.toLocalDate();
+        while (!currentDate.isAfter(endDate)) {
+            if (!isEmployeeAvailableForShift(shift.getEmployee().getId(), currentDate)) {
+                throw new BusinessRuleException("Employee is not available for shift on " + currentDate);
+            }
+            currentDate = currentDate.plusDays(1);
         }
 
         shift.setStartAt(startAt);
@@ -777,6 +795,24 @@ public class EmployeeService {
     public List<Employee> getEmployeesCreatedInLastDays(int days) {
         LocalDateTime date = LocalDateTime.now().minusDays(days);
         return employeeRepository.getEmployeesCreatedInLastDays(date);
+    }
+
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getTaskStatusCounts() {
+        long todo = employeeTaskRepository.countByStatus(TaskStatus.TODO);
+        long inProgress = employeeTaskRepository.countByStatus(TaskStatus.IN_PROGRESS);
+        long done = employeeTaskRepository.countByStatus(TaskStatus.DONE);
+        java.util.Map<String, Long> counts = new java.util.HashMap<>();
+        counts.put("todo", todo);
+        counts.put("inProgress", inProgress);
+        counts.put("done", done);
+        counts.put("total", todo + inProgress + done);
+        return counts;
+    }
+
+    @Transactional(readOnly = true)
+    public long getRejectedLeaveRequestsCount() {
+        return leaveRequestRepository.countByStatus(LeaveRequestStatus.REJECTED);
     }
 }
 

@@ -305,13 +305,16 @@ public class FeedbackService {
         }
 
         // Validate reservation is completed (check-out date has passed)
-        if (reservation.getCheckOut().isAfter(LocalDateTime.now().toLocalDate())) {
+        if (!reservation.getCheckOut().isBefore(LocalDateTime.now().toLocalDate())) {
             throw new BusinessRuleException("Feedback can only be provided after check-out date.");
         }
 
-        // Validate reservation is not cancelled (AUD-FDBK-001)
+        // Validate reservation is not cancelled and is confirmed (AUD-FDBK-001)
         if (reservation.getStatus() == ReservationStatus.CANCELLED) {
             throw new BusinessRuleException("Cannot provide feedback for a cancelled reservation.");
+        }
+        if (reservation.getStatus() != ReservationStatus.CONFIRMED) {
+            throw new BusinessRuleException("Feedback can only be provided for confirmed reservations.");
         }
     }
 

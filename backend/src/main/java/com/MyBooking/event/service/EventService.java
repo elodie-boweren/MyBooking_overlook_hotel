@@ -97,7 +97,8 @@ public class EventService {
                            LocalDateTime startAt, LocalDateTime endAt, Integer capacity,
                            BigDecimal price, String currency, Long installationId) {
         
-        Event event = getEventById(eventId);
+        Event event = eventRepository.findByIdForUpdate(eventId)
+            .orElseThrow(() -> new NotFoundException("Event not found with ID: " + eventId));
         
         // Validate new inputs
         validateEventInputs(name, eventType, startAt, endAt, capacity, price, currency);
@@ -106,8 +107,13 @@ public class EventService {
         Installation installation = installationRepository.findByIdForUpdate(installationId)
             .orElseThrow(() -> new NotFoundException("Installation not found with ID: " + installationId));
         
-        // Validate event capacity against installation capacity
+        // Validate event capacity against installation capacity and existing confirmed bookings
         validateEventCapacity(installation, capacity);
+        int confirmedParticipants = eventBookingRepository.countConfirmedParticipantsByEventId(eventId);
+        if (capacity < confirmedParticipants) {
+            throw new BusinessRuleException("Event capacity (" + capacity +
+                ") cannot be less than already confirmed participants (" + confirmedParticipants + ")");
+        }
         
         // Check installation availability (excluding current event)
         checkInstallationAvailabilityForUpdate(installationId, startAt, endAt, eventId);
@@ -191,6 +197,9 @@ public class EventService {
         }
         
         // Time validation
+        if (startAt == null || endAt == null) {
+            throw new BusinessRuleException("Event start time and end time are required");
+        }
         if (startAt.isBefore(now)) {
             throw new BusinessRuleException("Event start time cannot be in the past");
         }
@@ -206,7 +215,7 @@ public class EventService {
         }
         
         // Capacity validation
-        if (capacity < 1 || capacity > 100) {
+        if (capacity == null || capacity < 1 || capacity > 100) {
             throw new BusinessRuleException("Event capacity must be between 1 and 100");
         }
         
@@ -361,7 +370,11 @@ public class EventService {
      * Calculate event price based on installation hourly rate
      */
     public BigDecimal calculateEventPrice(Installation installation, LocalDateTime startAt, LocalDateTime endAt) {
-        long durationHours = ChronoUnit.HOURS.between(startAt, endAt);
+        if (startAt == null || endAt == null || !endAt.isAfter(startAt)) {
+            throw new BusinessRuleException("Event end time must be after start time");
+        }
+        long durationMinutes = ChronoUnit.MINUTES.between(startAt, endAt);
+        long durationHours = (durationMinutes + 59) / 60;
         
         // Base price calculation
         BigDecimal basePrice = installation.getHourlyRate().multiply(BigDecimal.valueOf(durationHours));
@@ -625,6 +638,12 @@ public class EventService {
         if (request.getReservationId() != null) {
             reservation = reservationRepository.findById(request.getReservationId())
                 .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + request.getReservationId()));
+            if (reservation.getClient() == null || !reservation.getClient().getId().equals(userId)) {
+                throw new BusinessRuleException("Access denied: Reservation does not belong to the user");
+            }
+            if (reservation.getStatus() == com.MyBooking.reservation.domain.ReservationStatus.CANCELLED) {
+                throw new BusinessRuleException("Cannot link an event booking to a cancelled reservation");
+            }
         }
         
         // Validate participant count
@@ -738,6 +757,19 @@ public class EventService {
     public com.MyBooking.event.dto.EventBookingResponseDto updateEventBookingStatusAsDto(Long bookingId, com.MyBooking.event.domain.EventBookingStatus status) {
         EventBooking booking = eventBookingRepository.findById(bookingId)
             .orElseThrow(() -> new NotFoundException("Event booking not found with ID: " + bookingId));
+
+        if (status == EventBookingStatus.CONFIRMED && booking.getStatus() != EventBookingStatus.CONFIRMED) {
+            Event event = eventRepository.findByIdForUpdate(booking.getEvent().getId())
+                .orElseThrow(() -> new NotFoundException("Event not found with ID: " + booking.getEvent().getId()));
+            if (event.getStartAt().isBefore(LocalDateTime.now())) {
+                throw new BusinessRuleException("Cannot confirm a booking for an event that has already started or taken place");
+            }
+            int currentBooked = eventBookingRepository.countConfirmedParticipantsByEventId(event.getId());
+            int requested = booking.getNumberOfParticipants() != null ? booking.getNumberOfParticipants() : 1;
+            if (currentBooked + requested > event.getCapacity()) {
+                throw new BusinessRuleException("Event capacity exceeded. Remaining capacity: " + (event.getCapacity() - currentBooked));
+            }
+        }
         
         booking.setStatus(status);
         EventBooking savedBooking = eventBookingRepository.save(booking);

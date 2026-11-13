@@ -156,22 +156,16 @@ public class InstallationService {
     @Transactional(readOnly = true)
     public BigDecimal calculateEventCost(Long installationId, LocalDateTime startDateTime, LocalDateTime endDateTime) {
         Installation installation = getInstallationById(installationId);
-        
-        // Calculate duration in hours (minimum 1 hour)
-        long durationHours = java.time.Duration.between(startDateTime, endDateTime).toHours();
-        if (durationHours < 1) {
-            durationHours = 1;
-        }
-        
-        return installation.getHourlyRate().multiply(BigDecimal.valueOf(durationHours));
+        return calculateEventCost(installation, startDateTime, endDateTime);
     }
 
     @Transactional(readOnly = true)
     public BigDecimal calculateEventCost(Installation installation, LocalDateTime startDateTime, LocalDateTime endDateTime) {
-        long durationHours = java.time.Duration.between(startDateTime, endDateTime).toHours();
-        if (durationHours < 1) {
-            durationHours = 1;
+        if (startDateTime == null || endDateTime == null || !endDateTime.isAfter(startDateTime)) {
+            throw new BusinessRuleException("Event end time must be after start time");
         }
+        long durationMinutes = java.time.Duration.between(startDateTime, endDateTime).toMinutes();
+        long durationHours = Math.max(1L, (durationMinutes + 59) / 60);
         
         return installation.getHourlyRate().multiply(BigDecimal.valueOf(durationHours));
     }

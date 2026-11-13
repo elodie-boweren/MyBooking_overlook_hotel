@@ -76,6 +76,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @param pageable pagination information
      * @return page of events with the specified type
      */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"installation"})
     Page<Event> findByEventType(EventType eventType, Pageable pageable);
     
     /**
@@ -104,6 +105,7 @@ public interface EventRepository extends JpaRepository<Event, Long> {
      * @param pageable pagination information
      * @return page of events for the specified installation
      */
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"installation"})
     Page<Event> findByInstallationId(Long installationId, Pageable pageable);
 
     // ==================== PRICE-BASED QUERIES ====================

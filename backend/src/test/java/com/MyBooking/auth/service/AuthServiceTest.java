@@ -342,6 +342,7 @@ class AuthServiceTest {
         existingPreference.setPushEnabled(false);
         
         when(userRepository.findByEmail(email)).thenReturn(Optional.of(testUser));
+        when(userRepository.findByIdForUpdate(testUser.getId())).thenReturn(Optional.of(testUser));
         when(notificationPreferenceRepository.findByUserAndNotificationType(testUser, notificationType))
             .thenReturn(Optional.of(existingPreference));
         when(notificationPreferenceRepository.save(any(NotificationPreference.class)))

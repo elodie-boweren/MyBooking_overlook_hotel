@@ -25,6 +25,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
 
     // Find by user (entity-based)
     List<Feedback> findByUser(User user);
+    @EntityGraph(attributePaths = {"user", "reservation"})
     Page<Feedback> findByUser(User user, Pageable pageable);
     
     // Find by user (ID-based)
@@ -34,6 +35,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     
     // Find by reservation (entity-based)
     List<Feedback> findByReservation(Reservation reservation);
+    @EntityGraph(attributePaths = {"user", "reservation"})
     Page<Feedback> findByReservation(Reservation reservation, Pageable pageable);
     
     // Find by reservation (ID-based)

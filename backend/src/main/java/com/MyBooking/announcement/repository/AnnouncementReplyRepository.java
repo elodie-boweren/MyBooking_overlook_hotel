@@ -76,6 +76,7 @@ public interface AnnouncementReplyRepository extends JpaRepository<AnnouncementR
     Page<AnnouncementReply> findRecentReplies(@Param("since") LocalDateTime since, Pageable pageable);
 
     // Find replies by announcement ordered by creation date (business logic in repository)
+    @EntityGraph(attributePaths = {"user"})
     @Query("SELECT ar FROM AnnouncementReply ar WHERE ar.announcement = :announcement ORDER BY ar.createdAt ASC")
     List<AnnouncementReply> findByAnnouncementOrderByCreatedAtAsc(@Param("announcement") Announcement announcement);
 

@@ -236,8 +236,9 @@ class EventServiceTest {
         updatedEvent.setCurrency("USD");
         updatedEvent.setInstallation(testInstallation);
 
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(testEvent));
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEvent));
         when(installationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testInstallation));
+        when(eventBookingRepository.countConfirmedParticipantsByEventId(1L)).thenReturn(0);
         when(eventRepository.existsOverlappingEventForInstallationExcludingEvent(
                 1L, testStartTime.plusHours(1), testEndTime.plusHours(1), 1L)).thenReturn(false);
         when(eventRepository.save(any(Event.class))).thenReturn(updatedEvent);
@@ -252,7 +253,7 @@ class EventServiceTest {
         assertThat(result.getName()).isEqualTo("Updated Meeting");
         assertThat(result.getCapacity()).isEqualTo(25);
 
-        verify(eventRepository).findById(1L);
+        verify(eventRepository).findByIdForUpdate(1L);
         verify(installationRepository).findByIdForUpdate(1L);
         verify(eventRepository).save(any(Event.class));
     }
@@ -260,7 +261,7 @@ class EventServiceTest {
     @Test
     void updateEvent_WithNonExistentEvent_ShouldThrowNotFoundException() {
         // Given
-        when(eventRepository.findById(999L)).thenReturn(Optional.empty());
+        when(eventRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> eventService.updateEvent(999L, "Updated Meeting", "Description",
@@ -268,7 +269,7 @@ class EventServiceTest {
         )).isInstanceOf(NotFoundException.class)
           .hasMessageContaining("Event not found with ID: 999");
 
-        verify(eventRepository).findById(999L);
+        verify(eventRepository).findByIdForUpdate(999L);
         verify(eventRepository, never()).save(any());
     }
 
@@ -529,16 +530,15 @@ class EventServiceTest {
     }
 
     @Test
-    void calculateEventPrice_WithZeroHours_ShouldReturnZero() {
+    void calculateEventPrice_WithZeroHours_ShouldThrowBusinessRuleException() {
         // Given
         LocalDateTime start = LocalDateTime.now();
         LocalDateTime end = start; // Same time
 
-        // When
-        BigDecimal result = eventService.calculateEventPrice(testInstallation, start, end);
-
-        // Then
-        assertThat(result).isEqualTo(new BigDecimal("0.00"));
+        // When & Then
+        assertThatThrownBy(() -> eventService.calculateEventPrice(testInstallation, start, end))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Event end time must be after start time");
     }
 
     // ========== EVENT BOOKING TESTS (P3-T03: INV-EVT-001, INV-EVT-002) ==========
@@ -641,5 +641,66 @@ class EventServiceTest {
 
         verify(eventBookingRepository).findById(10L);
         verify(eventBookingRepository).save(booking);
+    }
+
+    @Test
+    void updateEvent_WithCapacityLessThanConfirmedParticipants_ShouldThrowBusinessRuleException() {
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEvent));
+        when(installationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testInstallation));
+        when(eventBookingRepository.countConfirmedParticipantsByEventId(1L)).thenReturn(15);
+
+        assertThatThrownBy(() -> eventService.updateEvent(1L, "Updated Meeting", "Description",
+            EventType.CONFERENCE, testStartTime.plusHours(1), testEndTime.plusHours(1),
+            10, new BigDecimal("230.00"), "USD", 1L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("cannot be less than already confirmed participants");
+
+        verify(eventRepository, never()).save(any());
+    }
+
+    @Test
+    void updateEventBookingStatusAsDto_WhenConfirmingOverCapacity_ShouldThrowBusinessRuleException() {
+        EventBooking booking = new EventBooking();
+        booking.setId(20L);
+        booking.setEvent(testEvent);
+        booking.setClient(testUser);
+        booking.setStatus(EventBookingStatus.CANCELLED);
+        booking.setNumberOfParticipants(10);
+
+        testEvent.setCapacity(20);
+        testEvent.setStartAt(LocalDateTime.now().plusDays(2));
+
+        when(eventBookingRepository.findById(20L)).thenReturn(Optional.of(booking));
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEvent));
+        when(eventBookingRepository.countConfirmedParticipantsByEventId(1L)).thenReturn(15);
+
+        assertThatThrownBy(() -> eventService.updateEventBookingStatusAsDto(20L, EventBookingStatus.CONFIRMED))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Event capacity exceeded");
+
+        verify(eventBookingRepository, never()).save(any());
+    }
+
+    @Test
+    void createEventBookingAsDto_WithOtherUsersReservation_ShouldThrowBusinessRuleException() {
+        EventBookingCreateRequestDto request = new EventBookingCreateRequestDto();
+        request.setEventId(1L);
+        request.setReservationId(99L);
+        request.setNumberOfParticipants(1);
+
+        User otherUser = new User();
+        otherUser.setId(999L);
+        com.MyBooking.reservation.domain.Reservation otherReservation = new com.MyBooking.reservation.domain.Reservation();
+        otherReservation.setId(99L);
+        otherReservation.setClient(otherUser);
+        otherReservation.setStatus(com.MyBooking.reservation.domain.ReservationStatus.CONFIRMED);
+
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEvent));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(reservationRepository.findById(99L)).thenReturn(Optional.of(otherReservation));
+
+        assertThatThrownBy(() -> eventService.createEventBookingAsDto(request, 1L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Reservation does not belong to the user");
     }
 }

@@ -500,10 +500,13 @@ class EmployeeServiceTest {
     @Test
     void assignTraining_WithValidData_ShouldAssignTraining() {
         // Given
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(trainingRepository.findById(1L)).thenReturn(Optional.of(testTraining));
         when(employeeTrainingRepository.existsOverlappingInProgressTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
             .thenReturn(false);
+        when(leaveRequestRepository.findOverlappingLeaveRequestsForEmployeeId(eq(1L), any(LocalDate.class), any(LocalDate.class)))
+            .thenReturn(Collections.emptyList());
         when(employeeTrainingRepository.existsByEmployeeAndTraining(testUser, testTraining)).thenReturn(false);
         when(employeeTrainingRepository.save(any(EmployeeTraining.class))).thenReturn(testEmployeeTraining);
 
@@ -516,7 +519,8 @@ class EmployeeServiceTest {
         assertThat(result.getTraining()).isEqualTo(testTraining);
         assertThat(result.getStatus()).isEqualTo(TrainingStatus.ASSIGNED);
 
-        verify(employeeRepository, times(2)).findByUserId(1L); // Called twice: once in assignTraining, once in hasOverlappingTraining
+        verify(employeeRepository).findByUserIdForUpdate(1L);
+        verify(employeeRepository).findByUserId(1L); // Called in hasOverlappingTraining
         verify(trainingRepository).findById(1L);
         verify(employeeTrainingRepository).save(any(EmployeeTraining.class));
     }
@@ -524,6 +528,7 @@ class EmployeeServiceTest {
     @Test
     void assignTraining_WithOverlappingTraining_ShouldThrowBusinessRuleException() {
         // Given
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(trainingRepository.findById(1L)).thenReturn(Optional.of(testTraining));
         when(employeeTrainingRepository.existsOverlappingInProgressTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
@@ -534,7 +539,8 @@ class EmployeeServiceTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Employee already has overlapping training");
 
-        verify(employeeRepository, times(2)).findByUserId(1L); // Called twice: once in assignTraining, once in hasOverlappingTraining
+        verify(employeeRepository).findByUserIdForUpdate(1L);
+        verify(employeeRepository).findByUserId(1L); // Called in hasOverlappingTraining
         verify(trainingRepository).findById(1L);
         verify(employeeTrainingRepository, never()).save(any());
     }

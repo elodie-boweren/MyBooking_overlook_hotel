@@ -290,7 +290,7 @@ class ReservationServiceTest {
         LocalDate newCheckIn = LocalDate.now().plusDays(5);
         LocalDate newCheckOut = LocalDate.now().plusDays(7);
         
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
         when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(reservationRepository.countConflictingReservations(1L, newCheckIn, newCheckOut, 1L))
             .thenReturn(0L);
@@ -304,7 +304,7 @@ class ReservationServiceTest {
         assertThat(result.getCheckIn()).isEqualTo(newCheckIn);
         assertThat(result.getCheckOut()).isEqualTo(newCheckOut);
         
-        verify(reservationRepository).findById(1L);
+        verify(reservationRepository).findByIdForUpdate(1L);
         verify(roomRepository).findByIdForUpdate(1L);
         verify(reservationRepository).countConflictingReservations(1L, newCheckIn, newCheckOut, 1L);
         verify(reservationRepository).save(testReservation);
@@ -313,14 +313,14 @@ class ReservationServiceTest {
     @Test
     void updateReservation_WithReservationNotFound_ShouldThrowNotFoundException() {
         // Given
-        when(reservationRepository.findById(1L)).thenReturn(Optional.empty());
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
         
         // When & Then
         assertThatThrownBy(() -> reservationService.updateReservation(1L, testCheckIn, testCheckOut, 2, "USD"))
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining("Reservation not found with ID: 1");
         
-        verify(reservationRepository).findById(1L);
+        verify(reservationRepository).findByIdForUpdate(1L);
         verify(reservationRepository, never()).save(any());
     }
 
@@ -330,7 +330,7 @@ class ReservationServiceTest {
         LocalDate newCheckIn = LocalDate.now().plusDays(5);
         LocalDate newCheckOut = LocalDate.now().plusDays(7);
         
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
         when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(reservationRepository.countConflictingReservations(1L, newCheckIn, newCheckOut, 1L))
             .thenReturn(1L);
@@ -340,7 +340,7 @@ class ReservationServiceTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Room is not available for the selected dates");
         
-        verify(reservationRepository).findById(1L);
+        verify(reservationRepository).findByIdForUpdate(1L);
         verify(roomRepository).findByIdForUpdate(1L);
         verify(reservationRepository).countConflictingReservations(1L, newCheckIn, newCheckOut, 1L);
         verify(reservationRepository, never()).save(any());
@@ -678,5 +678,70 @@ class ReservationServiceTest {
         
         verify(reservationRepository).findById(1L);
         verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void updateReservation_WithCancelledReservation_ShouldThrowBusinessRuleException() {
+        testReservation.setStatus(ReservationStatus.CANCELLED);
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
+
+        assertThatThrownBy(() -> reservationService.updateReservation(
+                1L, LocalDate.now().plusDays(5), LocalDate.now().plusDays(7), 2, "USD"))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Cannot update a cancelled reservation");
+
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void updateReservation_WithPointsDiscount_ShouldPreserveDiscount() {
+        testReservation.setPointsUsed(100);
+        testReservation.setPointsDiscount(new BigDecimal("10.00"));
+        LocalDate newCheckIn = LocalDate.now().plusDays(5);
+        LocalDate newCheckOut = LocalDate.now().plusDays(7); // 2 nights * 100 + 10% tax = 220.00
+
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
+        when(reservationRepository.countConflictingReservations(1L, newCheckIn, newCheckOut, 1L)).thenReturn(0L);
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Reservation result = reservationService.updateReservation(1L, newCheckIn, newCheckOut, 2, "USD");
+
+        assertThat(result.getTotalPrice()).isEqualByComparingTo(new BigDecimal("210.00"));
+    }
+
+    @Test
+    void reassignReservation_WithCancelledReservation_ShouldThrowBusinessRuleException() {
+        testReservation.setStatus(ReservationStatus.CANCELLED);
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
+
+        assertThatThrownBy(() -> reservationService.reassignReservation(1L, 2L))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Cannot reassign a cancelled reservation");
+
+        verify(reservationRepository, never()).save(any());
+    }
+
+    @Test
+    void reassignReservation_ShouldRecalculatePriceAndPreservePointsDiscount() {
+        testReservation.setPointsUsed(100);
+        testReservation.setPointsDiscount(new BigDecimal("10.00"));
+        testReservation.setCheckIn(LocalDate.now().plusDays(2));
+        testReservation.setCheckOut(LocalDate.now().plusDays(4)); // 2 nights
+        testReservation.setNumberOfGuests(2);
+
+        Room expensiveRoom = new Room("202", RoomType.DELUXE, 2, new BigDecimal("200.00"), "USD", RoomStatus.AVAILABLE);
+        expensiveRoom.setId(2L);
+
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
+        when(roomRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(expensiveRoom));
+        when(reservationRepository.countConflictingReservations(2L, testReservation.getCheckIn(), testReservation.getCheckOut(), 1L))
+            .thenReturn(0L);
+        when(reservationRepository.save(any(Reservation.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        com.MyBooking.reservation.dto.ReservationResponseDto dto = reservationService.reassignReservation(1L, 2L);
+
+        // 2 nights * 200.00 = 400.00 + 10% tax = 440.00 - 10.00 discount = 430.00
+        assertThat(dto.getTotalPrice()).isEqualByComparingTo(new BigDecimal("430.00"));
     }
 }

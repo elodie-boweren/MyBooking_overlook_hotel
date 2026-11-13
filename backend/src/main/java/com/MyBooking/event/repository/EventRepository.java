@@ -3,6 +3,7 @@ package com.MyBooking.event.repository;
 import com.MyBooking.event.domain.Event;
 import com.MyBooking.event.domain.EventType;
 import com.MyBooking.installation.domain.Installation;
+import com.MyBooking.installation.domain.InstallationType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -553,4 +554,27 @@ public interface EventRepository extends JpaRepository<Event, Long> {
                               @Param("minCapacity") Integer minCapacity,
                               @Param("currency") String currency,
                               Pageable pageable);
+
+    // ==================== P3-T06 PUSH-DOWN QUERIES ====================
+
+    List<Event> findByStartAtBetween(LocalDateTime startDate, LocalDateTime endDate);
+
+    List<Event> findByStartAtGreaterThanEqual(LocalDateTime now);
+
+    Page<Event> findByStartAtGreaterThanEqual(LocalDateTime now, Pageable pageable);
+
+    @Query("SELECT COALESCE(SUM(e.price), 0) FROM Event e WHERE e.currency = :currency")
+    BigDecimal getRevenueByCurrency(@Param("currency") String currency);
+
+    @Query("SELECT e FROM Event e WHERE e.installation.installationType = :installationType")
+    List<Event> findByInstallationType(@Param("installationType") InstallationType installationType);
+
+    @Query("SELECT e FROM Event e WHERE e.installation.installationType = :installationType")
+    Page<Event> findByInstallationType(@Param("installationType") InstallationType installationType, Pageable pageable);
+
+    @Query("SELECT COUNT(e) FROM Event e WHERE e.startAt >= :now")
+    long countUpcomingEvents(@Param("now") LocalDateTime now);
+
+    @Query("SELECT COALESCE(SUM(e.price), 0) FROM Event e")
+    BigDecimal getTotalEventRevenue();
 }

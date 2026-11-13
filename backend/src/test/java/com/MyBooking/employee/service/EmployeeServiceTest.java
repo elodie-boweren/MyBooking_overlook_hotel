@@ -390,6 +390,7 @@ class EmployeeServiceTest {
         LocalDate fromDate = LocalDate.now().plusDays(7);
         LocalDate toDate = LocalDate.now().plusDays(10);
         
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(leaveRequestRepository.findOverlappingLeaveRequestsForEmployeeId(1L, fromDate, toDate))
             .thenReturn(Collections.emptyList());
@@ -405,7 +406,8 @@ class EmployeeServiceTest {
         assertThat(result.getToDate()).isEqualTo(toDate);
         assertThat(result.getStatus()).isEqualTo(LeaveRequestStatus.PENDING);
 
-        verify(employeeRepository, times(2)).findByUserId(1L); // Called twice: once in createLeaveRequest, once in hasOverlappingTraining
+        verify(employeeRepository).findByUserIdForUpdate(1L);
+        verify(employeeRepository).findByUserId(1L);
         verify(leaveRequestRepository).findOverlappingLeaveRequestsForEmployeeId(1L, fromDate, toDate);
         verify(leaveRequestRepository).save(any(LeaveRequest.class));
     }
@@ -415,14 +417,14 @@ class EmployeeServiceTest {
         // Given
         LocalDate fromDate = LocalDate.now().plusDays(10);
         LocalDate toDate = LocalDate.now().plusDays(7); // End before start
-        when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
 
         // When & Then
         assertThatThrownBy(() -> employeeService.createLeaveRequest(1L, fromDate, toDate, "Vacation"))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Leave start date cannot be after end date");
 
-        verify(employeeRepository).findByUserId(1L);
+        verify(employeeRepository).findByUserIdForUpdate(1L);
         verify(leaveRequestRepository, never()).save(any());
     }
 
@@ -431,14 +433,14 @@ class EmployeeServiceTest {
         // Given
         LocalDate fromDate = LocalDate.now().minusDays(1);
         LocalDate toDate = LocalDate.now().plusDays(3);
-        when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
 
         // When & Then
         assertThatThrownBy(() -> employeeService.createLeaveRequest(1L, fromDate, toDate, "Vacation"))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Leave start date cannot be in the past");
 
-        verify(employeeRepository).findByUserId(1L);
+        verify(employeeRepository).findByUserIdForUpdate(1L);
         verify(leaveRequestRepository, never()).save(any());
     }
 
@@ -448,7 +450,7 @@ class EmployeeServiceTest {
         LocalDate fromDate = LocalDate.now().plusDays(7);
         LocalDate toDate = LocalDate.now().plusDays(10);
         
-        when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
         when(leaveRequestRepository.findOverlappingLeaveRequestsForEmployeeId(1L, fromDate, toDate))
             .thenReturn(Arrays.asList(testLeaveRequest));
 
@@ -457,7 +459,7 @@ class EmployeeServiceTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Employee already has overlapping leave request");
 
-        verify(employeeRepository).findByUserId(1L);
+        verify(employeeRepository).findByUserIdForUpdate(1L);
         verify(leaveRequestRepository).findOverlappingLeaveRequestsForEmployeeId(1L, fromDate, toDate);
         verify(leaveRequestRepository, never()).save(any());
     }
@@ -687,6 +689,7 @@ class EmployeeServiceTest {
         existingShift.setId(10L);
 
         when(shiftRepository.findById(10L)).thenReturn(Optional.of(existingShift));
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
         when(shiftRepository.findOverlappingShiftsForEmployeeIdExcludingShiftId(startAt, endAt, 1L, 10L))
             .thenReturn(Collections.emptyList());
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));

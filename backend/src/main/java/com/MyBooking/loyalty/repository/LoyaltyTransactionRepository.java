@@ -26,6 +26,7 @@ public interface LoyaltyTransactionRepository extends JpaRepository<LoyaltyTrans
     // Find by account (ID-based)
     List<LoyaltyTransaction> findByAccountId(Long accountId);
     Page<LoyaltyTransaction> findByAccountId(Long accountId, Pageable pageable);
+    List<LoyaltyTransaction> findByAccountIdAndCreatedAtAfterOrderByCreatedAtDesc(Long accountId, LocalDateTime since);
 
     // Find by transaction type
     List<LoyaltyTransaction> findByType(LoyaltyTxType type);

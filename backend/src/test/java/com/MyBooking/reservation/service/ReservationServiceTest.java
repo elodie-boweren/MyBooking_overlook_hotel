@@ -105,7 +105,7 @@ class ReservationServiceTest {
     @Test
     void createReservation_WithValidData_ShouldCreateReservation() {
         // Given
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
             .thenReturn(Collections.emptyList());
@@ -123,7 +123,7 @@ class ReservationServiceTest {
         assertThat(result.getClient()).isEqualTo(testUser);
         assertThat(result.getRoom()).isEqualTo(testRoom);
         
-        verify(roomRepository).findById(1L);
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(1L);
         verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
         verify(reservationRepository).save(any(Reservation.class));
@@ -134,7 +134,7 @@ class ReservationServiceTest {
     void createReservation_WhenRoomIsOutOfService_ShouldThrowBusinessRuleException() {
         // Given
         testRoom.setStatus(RoomStatus.OUT_OF_SERVICE);
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         
         // When & Then
@@ -142,7 +142,7 @@ class ReservationServiceTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("is currently out of service and cannot be reserved");
         
-        verify(roomRepository).findById(1L);
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(1L);
         verify(reservationRepository, never()).save(any());
         verify(roomService, never()).updateRoomStatusAutomatically(anyLong(), any(), anyString());
@@ -151,14 +151,14 @@ class ReservationServiceTest {
     @Test
     void createReservation_WithRoomNotFound_ShouldThrowNotFoundException() {
         // Given
-        when(roomRepository.findById(1L)).thenReturn(Optional.empty());
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.empty());
         
         // When & Then
         assertThatThrownBy(() -> reservationService.createReservation(1L, 1L, testCheckIn, testCheckOut, 2, "USD"))
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining("Room not found with ID: 1");
         
-        verify(roomRepository).findById(1L);
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(userRepository, never()).findById(any());
         verify(reservationRepository, never()).save(any());
     }
@@ -166,7 +166,7 @@ class ReservationServiceTest {
     @Test
     void createReservation_WithUserNotFound_ShouldThrowNotFoundException() {
         // Given
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
         
         // When & Then
@@ -174,7 +174,7 @@ class ReservationServiceTest {
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining("Client not found with ID: 1");
         
-        verify(roomRepository).findById(1L);
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(1L);
         verify(reservationRepository, never()).save(any());
     }
@@ -238,7 +238,7 @@ class ReservationServiceTest {
     @Test
     void createReservation_WithRoomCapacityExceeded_ShouldThrowBusinessRuleException() {
         // Given
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom)); // Room capacity is 2
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom)); // Room capacity is 2
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         
         // When & Then
@@ -246,7 +246,7 @@ class ReservationServiceTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Number of guests (3) exceeds room capacity (2)");
         
-        verify(roomRepository).findById(1L);
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(1L);
         verify(reservationRepository, never()).save(any());
     }
@@ -254,7 +254,7 @@ class ReservationServiceTest {
     @Test
     void createReservation_WithRoomNotAvailable_ShouldThrowBusinessRuleException() {
         // Given
-        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
         when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
             .thenReturn(Arrays.asList(testReservation)); // Room has conflicting reservation
@@ -264,7 +264,7 @@ class ReservationServiceTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Room is not available for the selected dates");
         
-        verify(roomRepository).findById(1L);
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(1L);
         verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
         verify(reservationRepository, never()).save(any());
@@ -291,6 +291,7 @@ class ReservationServiceTest {
         LocalDate newCheckOut = LocalDate.now().plusDays(7);
         
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(reservationRepository.checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L))
             .thenReturn(Collections.emptyList());
         when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
@@ -304,6 +305,7 @@ class ReservationServiceTest {
         assertThat(result.getCheckOut()).isEqualTo(newCheckOut);
         
         verify(reservationRepository).findById(1L);
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(reservationRepository).checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L);
         verify(reservationRepository).save(testReservation);
     }
@@ -331,6 +333,7 @@ class ReservationServiceTest {
         conflictingReservation.setId(99L);
         
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(reservationRepository.checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L))
             .thenReturn(List.of(conflictingReservation));
         
@@ -340,6 +343,7 @@ class ReservationServiceTest {
             .hasMessageContaining("Room is not available for the selected dates");
         
         verify(reservationRepository).findById(1L);
+        verify(roomRepository).findByIdForUpdate(1L);
         verify(reservationRepository).checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L);
         verify(reservationRepository, never()).save(any());
     }
@@ -349,7 +353,7 @@ class ReservationServiceTest {
     @Test
     void cancelReservation_WithValidReservation_ShouldCancelReservation() {
         // Given
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
         when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
         
         // When
@@ -358,7 +362,7 @@ class ReservationServiceTest {
         // Then
         assertThat(testReservation.getStatus()).isEqualTo(ReservationStatus.CANCELLED);
         
-        verify(reservationRepository).findById(1L);
+        verify(reservationRepository).findByIdForUpdate(1L);
         verify(reservationRepository).save(testReservation);
         verify(roomService, never()).updateRoomStatusAutomatically(anyLong(), any(), anyString());
         verify(loyaltyService).clawbackReservationPoints(1L);
@@ -368,7 +372,7 @@ class ReservationServiceTest {
     void cancelReservation_WithRedeemedPoints_ShouldRefundAndClawbackPoints() {
         // Given
         testReservation.setPointsUsed(300);
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
         when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
 
         // When
@@ -385,14 +389,14 @@ class ReservationServiceTest {
     void cancelReservation_WithAlreadyCancelled_ShouldThrowBusinessRuleException() {
         // Given
         testReservation.setStatus(ReservationStatus.CANCELLED);
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
         
         // When & Then
         assertThatThrownBy(() -> reservationService.cancelReservation(1L, "Test reason"))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Reservation is already cancelled");
         
-        verify(reservationRepository).findById(1L);
+        verify(reservationRepository).findByIdForUpdate(1L);
         verify(reservationRepository, never()).save(any());
     }
 
@@ -400,14 +404,14 @@ class ReservationServiceTest {
     void cancelReservation_AfterCheckInDate_ShouldThrowBusinessRuleException() {
         // Given
         testReservation.setCheckIn(LocalDate.now().minusDays(1)); // Check-in was yesterday
-        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(reservationRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testReservation));
         
         // When & Then
         assertThatThrownBy(() -> reservationService.cancelReservation(1L, "Test reason"))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Cannot cancel reservation after check-in date has passed");
         
-        verify(reservationRepository).findById(1L);
+        verify(reservationRepository).findByIdForUpdate(1L);
         verify(reservationRepository, never()).save(any());
     }
 
@@ -444,10 +448,8 @@ class ReservationServiceTest {
     @Test
     void getAvailableRooms_WithValidCriteria_ShouldReturnAvailableRooms() {
         // Given
-        List<Room> allRooms = Arrays.asList(testRoom);
-        when(roomRepository.findAll()).thenReturn(allRooms);
-        when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
-            .thenReturn(Collections.emptyList());
+        when(roomRepository.findAvailableRooms(testCheckIn, testCheckOut, 2))
+            .thenReturn(List.of(testRoom));
         
         // When
         List<Room> result = reservationService.getAvailableRooms(testCheckIn, testCheckOut, 2);
@@ -456,18 +458,14 @@ class ReservationServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0)).isEqualTo(testRoom);
         
-        verify(roomRepository).findAll();
-        verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
+        verify(roomRepository).findAvailableRooms(testCheckIn, testCheckOut, 2);
     }
 
     @Test
     void getAvailableRooms_ShouldExcludeOutOfServiceRooms() {
         // Given
-        Room oosRoom = new Room("999", RoomType.SINGLE, 2, new BigDecimal("100.00"), "USD", RoomStatus.OUT_OF_SERVICE);
-        oosRoom.setId(999L);
-        when(roomRepository.findAll()).thenReturn(List.of(testRoom, oosRoom));
-        when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
-            .thenReturn(Collections.emptyList());
+        when(roomRepository.findAvailableRooms(testCheckIn, testCheckOut, 2))
+            .thenReturn(List.of(testRoom));
         
         // When
         List<Room> result = reservationService.getAvailableRooms(testCheckIn, testCheckOut, 2);
@@ -475,7 +473,7 @@ class ReservationServiceTest {
         // Then
         assertThat(result).hasSize(1);
         assertThat(result.get(0)).isEqualTo(testRoom);
-        verify(reservationRepository, never()).checkRoomAvailability(eq(999L), any(), any());
+        verify(roomRepository).findAvailableRooms(testCheckIn, testCheckOut, 2);
     }
 
     // ========== BUSINESS LOGIC TESTS ==========

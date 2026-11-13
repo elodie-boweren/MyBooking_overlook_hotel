@@ -105,7 +105,7 @@ class AnalyticsServiceTest {
             .thenReturn(List.of(crossMonthRes));
         when(eventService.getTotalEventRevenueBetweenDates(any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(new BigDecimal("150.00"));
-        when(authService.getUsersByRole(Role.CLIENT)).thenReturn(List.of(testClient));
+        when(authService.countUsersByRole(Role.CLIENT)).thenReturn(1L);
 
         RoomService.RoomStatistics roomStats = new RoomService.RoomStatistics(10L, 8L, 2L, 0L);
         when(roomService.getRoomStatistics()).thenReturn(roomStats);
@@ -148,7 +148,7 @@ class AnalyticsServiceTest {
             .thenReturn(Collections.emptyList());
         when(eventService.getTotalEventRevenueBetweenDates(any(LocalDateTime.class), any(LocalDateTime.class)))
             .thenReturn(new BigDecimal("1234.50"));
-        when(authService.getUsersByRole(Role.CLIENT)).thenReturn(Collections.emptyList());
+        when(authService.countUsersByRole(Role.CLIENT)).thenReturn(0L);
 
         RoomService.RoomStatistics roomStats = new RoomService.RoomStatistics(5L, 5L, 0L, 0L);
         when(roomService.getRoomStatistics()).thenReturn(roomStats);

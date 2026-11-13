@@ -121,4 +121,13 @@ public interface ShiftRepository extends JpaRepository<Shift, Long> {
     @Query("SELECT s FROM Shift s WHERE s.employee.id = :employeeId AND s.startAt >= :date ORDER BY s.startAt DESC")
     List<Shift> findRecentShiftsByEmployeeId(@Param("employeeId") Long employeeId, 
                                             @Param("date") LocalDateTime date);
+
+    @Query("SELECT s FROM Shift s WHERE " +
+           "(:employeeId IS NULL OR s.employee.id = :employeeId) AND " +
+           "(:startAt IS NULL OR s.startAt >= :startAt) AND " +
+           "(:endAt IS NULL OR s.endAt <= :endAt)")
+    Page<Shift> searchShifts(@Param("employeeId") Long employeeId,
+                             @Param("startAt") LocalDateTime startAt,
+                             @Param("endAt") LocalDateTime endAt,
+                             Pageable pageable);
 }

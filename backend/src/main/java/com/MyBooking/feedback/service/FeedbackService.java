@@ -432,10 +432,10 @@ public class FeedbackService {
         }
         stats.setRatingDistribution(distribution);
         
-        // Get feedbacks with/without comments (simplified implementation)
-        // For now, set to 0 - can be enhanced later with proper repository methods
-        stats.setFeedbacksWithComments(0L);
-        stats.setFeedbacksWithoutComments(totalCount);
+        // Get feedbacks with/without comments using database count
+        long withComments = feedbackRepository.countFeedbacksWithComments();
+        stats.setFeedbacksWithComments(withComments);
+        stats.setFeedbacksWithoutComments(Math.max(0L, totalCount - withComments));
         
         // Get high/low rated feedbacks (simplified implementation)
         long highRated = feedbackRepository.countByRatingBetween(4, 5);

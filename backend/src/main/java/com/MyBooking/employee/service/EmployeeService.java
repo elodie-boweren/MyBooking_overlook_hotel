@@ -231,8 +231,9 @@ public class EmployeeService {
      * Create a leave request
      */
     public LeaveRequest createLeaveRequest(Long employeeId, LocalDate fromDate, LocalDate toDate, String reason) {
-        // Validate employee exists and is active
-        Employee employee = getEmployeeByUserId(employeeId);
+        // Validate employee exists and is active (with pessimistic lock to serialize concurrent leave requests)
+        Employee employee = employeeRepository.findByUserIdForUpdate(employeeId)
+            .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + employeeId));
         if (employee.getStatus() != EmployeeStatus.ACTIVE) {
             throw new BusinessRuleException("Cannot create leave request for inactive employee");
         }
@@ -641,8 +642,9 @@ public class EmployeeService {
      * Create a new shift for an employee
      */
     public Shift createShift(Long employeeId, LocalDateTime startAt, LocalDateTime endAt) {
-        // Validate employee exists and is active
-        Employee employee = getEmployeeByUserId(employeeId);
+        // Validate employee exists and is active (with pessimistic lock to serialize concurrent shift assignments)
+        Employee employee = employeeRepository.findByUserIdForUpdate(employeeId)
+            .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + employeeId));
         if (employee.getStatus() != EmployeeStatus.ACTIVE) {
             throw new BusinessRuleException("Cannot assign shift to inactive employee");
         }
@@ -678,6 +680,10 @@ public class EmployeeService {
     public Shift updateShift(Long shiftId, LocalDateTime startAt, LocalDateTime endAt) {
         Shift shift = shiftRepository.findById(shiftId)
             .orElseThrow(() -> new NotFoundException("Shift not found with ID: " + shiftId));
+
+        // Lock employee record to serialize concurrent shift updates
+        employeeRepository.findByUserIdForUpdate(shift.getEmployee().getId())
+            .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + shift.getEmployee().getId()));
 
         // Validate time range
         if (startAt.isAfter(endAt)) {
@@ -743,22 +749,7 @@ public class EmployeeService {
      */
     @Transactional(readOnly = true)
     public Page<Shift> searchShifts(Long employeeId, LocalDateTime startAt, LocalDateTime endAt, Pageable pageable) {
-        if (employeeId != null) {
-            // For employee-specific searches, we'll use the basic findByEmployeeId with pagination
-            // and then filter by date range in memory if needed
-            // This is a limitation of the current repository design
-            return shiftRepository.findByEmployeeId(employeeId, pageable);
-        } else {
-            if (startAt != null && endAt != null) {
-                return shiftRepository.findByStartAtBetween(startAt, endAt, pageable);
-            } else if (startAt != null) {
-                return shiftRepository.findByStartAtAfter(startAt, pageable);
-            } else if (endAt != null) {
-                return shiftRepository.findByEndAtBefore(endAt, pageable);
-            } else {
-                return shiftRepository.findAll(pageable);
-            }
-        }
+        return shiftRepository.searchShifts(employeeId, startAt, endAt, pageable);
     }
 
     // ==================== STATISTICS AND ANALYTICS ====================

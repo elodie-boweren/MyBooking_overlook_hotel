@@ -4,8 +4,8 @@
 - **Phase**: Phase 03 — Domain Refactoring & Reservation Core Fixes
 - **Feature Branch**: `feature/phase-3-domain-refactoring`
 - **Execution Date**: November 2026
-- **Status**: **IN PROGRESS (P3-T01 through P3-T05 & P3-T07 Verified; P3-T08 & P3-T09 in queue prior to P3-T06 Concurrency Stress Test)**
-- **Test Suite Status**: **1,166 / 1,166 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
+- **Status**: **COMPLETE & FULLY VERIFIED (P3-T01 through P3-T09 & P3-T06 Capstone Verified)**
+- **Test Suite Status**: **1,180 / 1,180 Passing (100% Pass Rate, 0 Failures, 0 Errors, 0 Skipped)**
 - **Authoritative Invariants**: `INV-RES-001`, `INV-RES-002`, `INV-RES-003`, `INV-ROOM-001`, `INV-EVT-001`, `INV-EVT-002`, `INV-EVT-003`, `INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`, `INV-EMP-001`, `INV-EMP-002`, `INV-ANL-001`, `INV-ANL-002`, `INV-ANN-001` (documented in `docs/architecture/domain-invariants.md`)
 
 ---
@@ -478,9 +478,25 @@ Upon completion of tickets `P3-T01` through `P3-T09`, the full Phase 3 domain re
 - `P3-T04`: Loyalty Points Post-Stay Accrual, Cancellation Clawback & Concurrency Hardening (`INV-LOY-001`, `INV-LOY-002`, `INV-LOY-003`) — *COMPLETED*
 - `P3-T05`: Employee Leave Integrity, Shift Overlap & Feedback Status Guard (`INV-EMP-001`, `INV-EMP-002`, `AUD-EMP-001`, `AUD-EMP-002`, `AUD-FDBK-001`) — *COMPLETED*
 - `P3-T07`: Analytics Query Hardening, Heap Scan Elimination & USALI Real Financial Metrics (`INV-ANL-001`, `INV-ANL-002`, `AUD-ANL-001`, `AUD-ANL-002`) — *COMPLETED*
-- `P3-T08`: Department Domain Model & Announcement REST API with Audience Scoping (`INV-ANN-001`, `AUD-ANN-001`, `AUD-ANN-002`)
-- `P3-T09`: Installation Availability Query Hardening & Event Update Self-Exclusion (`INV-EVT-003`, `AUD-EVT-003`)
-- `P3-T06`: Concurrency Stress Test Suite & Business Invariant Regression Harness (Final Capstone)
+- `P3-T08`: Department Domain Model & Announcement REST API with Audience Scoping (`INV-ANN-001`, `AUD-ANN-001`, `AUD-ANN-002`) — *COMPLETED*
+- `P3-T09`: Installation Availability Query Hardening & Event Update Self-Exclusion (`INV-EVT-003`, `AUD-EVT-003`) — *COMPLETED*
+- `P3-T06`: Concurrency Stress Test Suite & Business Invariant Regression Harness (Final Capstone) — *COMPLETED*
+  - **Concurrency Stress Verification (`Phase3ConcurrencyStressTest`)**:
+    - `INV-EVT-001` (12 parallel threads booking a 5-spot event): **5 succeeded, 7 rejected**, 0 overbookings, 0 deadlocks.
+    - `INV-RES-001` (8 parallel threads booking overlapping dates on the same room): **1 succeeded, 7 rejected** after adding `RoomRepository.findByIdForUpdate` (`PESSIMISTIC_WRITE`).
+    - `INV-LOY-001` (10 parallel threads redeeming 30 pts each on a 100-pt balance): **balance >= 0, zero lost updates** (wired `LoyaltyAccountRepository.findByUserIdForUpdate` into all mutation paths).
+    - `INV-EMP-002` (8 parallel threads assigning overlapping shifts to the same employee): **1 succeeded, 7 rejected** after adding `EmployeeRepository.findByUserIdForUpdate` (`PESSIMISTIC_WRITE`).
+  - **Hibernate Query-Count & Latency Benchmark (`QueryPerformanceBenchmarkTest`, 50 installations × 500 events)**:
+    - `InstallationService.findAvailableInstallations`: **1 SQL** (24 ms)
+    - `EventService.getAvailableInstallations`: **1 SQL** (1 ms)
+    - `EventService.isInstallationAvailable`: **1 SQL** (3 ms)
+    - `EventService.getEventStatistics`: **3 SQL** (12 ms)
+  - **Cross-Service Audit & Hardening Fixes**:
+    - `ReservationService`: Added missing `checkRoomAvailability` & past-date check to `createReservationWithPoints`; added `findByIdForUpdate` locks to `updateReservation`, `reassignReservation`, and `cancelReservation`; replaced `getAvailableRooms` `findAll()` + N+1 loop with single-query `RoomRepository.findAvailableRooms`.
+    - `AnnouncementService`: Replaced `getMostRepliedAnnouncements` `findAll()` + $O(N \log N)$ reply count sort with single JPQL `findMostRepliedAnnouncements`; fixed `searchAnnouncements` unmodifiable-list & pagination bug with `searchByTitleOrContent`.
+    - `EventService`: Replaced 4 remaining `findAll()` scans (`getEventsByDateRange`, `getUpcomingEvents`, `getEventsByInstallationType`, `getEventStatistics`) and `getRevenueByCurrency` stream sum with database queries; fixed `searchEventsAsDto` hardcoded `"EUR"` currency and `getUpcomingEventsAsDto` returning past events.
+    - `EmployeeService`: Added `findByUserIdForUpdate` locks to `createLeaveRequest` and `updateShift`; fixed `searchShifts` ignoring `startAt`/`endAt` when `employeeId` is provided.
+    - `LoyaltyService`, `FeedbackService`, `AnalyticsService`: Replaced `getRecentTransactions` in-memory filter with `findByAccountIdAndCreatedAtAfterOrderByCreatedAtDesc`; replaced hardcoded `0L` comments count in `getFeedbackStatistics` with `countFeedbacksWithComments()`; replaced `getTotalActiveCustomers` `findAll()`-by-role with `authService.countUsersByRole(Role.CLIENT)`.
 
 The platform will then advance to **Milestone IdP**:
 1. **Keycloak Identity Provider Adoption**: Centralized OAuth2/OIDC realm configuration (`mybooking-platform`), Docker Compose topology, user migration preserving database IDs.
@@ -492,7 +508,7 @@ The platform will then advance to **Milestone IdP**:
 ## 9. Formal Sign-off & Architectural Acceptance
 
 - **Phase Technical Status**: **COMPLETE & FULLY VERIFIED**
-- **Regression Baseline**: **1,160 / 1,160 Tests Passing (100%)**
+- **Regression Baseline**: **1,180 / 1,180 Tests Passing (100%)**
 - **Sign-off Date**: November 2026
 - **Architecture Governance Alignment**: Reconciled 15-Phase Roadmap & Domain Invariants Matrix Certified.
 

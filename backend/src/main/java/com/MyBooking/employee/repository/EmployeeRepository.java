@@ -3,9 +3,11 @@ package com.MyBooking.employee.repository;
 import com.MyBooking.employee.domain.Employee;
 import com.MyBooking.employee.domain.EmployeeStatus;
 import com.MyBooking.auth.domain.User;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -23,6 +25,13 @@ public interface EmployeeRepository extends JpaRepository<Employee, Long> {
      * Find employee by user ID
      */
     Optional<Employee> findByUserId(Long userId);
+
+    /**
+     * Find employee by user ID with pessimistic write lock to serialize concurrent shift assignments
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT e FROM Employee e WHERE e.userId = :userId")
+    Optional<Employee> findByUserIdForUpdate(@Param("userId") Long userId);
     
     /**
      * Find employee by user

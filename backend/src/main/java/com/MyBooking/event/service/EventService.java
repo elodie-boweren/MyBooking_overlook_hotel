@@ -333,11 +333,7 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public List<Event> getEventsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
-        // Get all events and filter by date range manually
-        List<Event> allEvents = eventRepository.findAll();
-        return allEvents.stream()
-            .filter(event -> !event.getStartAt().isBefore(startDate) && !event.getStartAt().isAfter(endDate))
-            .toList();
+        return eventRepository.findByStartAtBetween(startDate, endDate);
     }
 
     /**
@@ -345,11 +341,7 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public List<Event> getUpcomingEvents() {
-        LocalDateTime now = LocalDateTime.now();
-        List<Event> allEvents = eventRepository.findAll();
-        return allEvents.stream()
-            .filter(event -> !event.getStartAt().isBefore(now))
-            .toList();
+        return eventRepository.findByStartAtGreaterThanEqual(LocalDateTime.now());
     }
 
     /**
@@ -393,10 +385,7 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public List<Event> getEventsByInstallationType(InstallationType installationType) {
-        List<Event> allEvents = eventRepository.findAll();
-        return allEvents.stream()
-            .filter(event -> event.getInstallation().getInstallationType() == installationType)
-            .toList();
+        return eventRepository.findByInstallationType(installationType);
     }
 
     /**
@@ -404,12 +393,7 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public Page<Event> getEventsByInstallationType(InstallationType installationType, Pageable pageable) {
-        List<Event> filteredEvents = getEventsByInstallationType(installationType);
-        // Simple pagination implementation
-        int start = (int) pageable.getOffset();
-        int end = Math.min(start + pageable.getPageSize(), filteredEvents.size());
-        List<Event> pageContent = filteredEvents.subList(start, end);
-        return new org.springframework.data.domain.PageImpl<>(pageContent, pageable, filteredEvents.size());
+        return eventRepository.findByInstallationType(installationType, pageable);
     }
 
     // ========== STATISTICS & ANALYTICS ==========
@@ -419,23 +403,19 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public EventStatistics getEventStatistics() {
-        List<Event> allEvents = eventRepository.findAll();
-        long totalEvents = allEvents.size();
-        
-        LocalDateTime now = LocalDateTime.now();
-        long upcomingEvents = allEvents.stream()
-            .filter(event -> !event.getStartAt().isBefore(now))
-            .count();
+        long totalEvents = eventRepository.count();
+        long upcomingEvents = eventRepository.countUpcomingEvents(LocalDateTime.now());
         long pastEvents = totalEvents - upcomingEvents;
-        
-        BigDecimal totalRevenue = allEvents.stream()
-            .map(Event::getPrice)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
-        BigDecimal averagePrice = totalEvents > 0 ? 
-            totalRevenue.divide(BigDecimal.valueOf(totalEvents), 2, RoundingMode.HALF_UP) : 
-            BigDecimal.ZERO;
-        
+
+        BigDecimal totalRevenue = eventRepository.getTotalEventRevenue();
+        if (totalRevenue == null) {
+            totalRevenue = BigDecimal.ZERO;
+        }
+
+        BigDecimal averagePrice = totalEvents > 0
+            ? totalRevenue.divide(BigDecimal.valueOf(totalEvents), 2, RoundingMode.HALF_UP)
+            : BigDecimal.ZERO;
+
         return new EventStatistics(totalEvents, upcomingEvents, pastEvents, totalRevenue, averagePrice);
     }
 
@@ -444,10 +424,8 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public BigDecimal getRevenueByCurrency(String currency) {
-        List<Event> events = eventRepository.findByCurrency(currency);
-        return events.stream()
-            .map(Event::getPrice)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal revenue = eventRepository.getRevenueByCurrency(currency);
+        return revenue != null ? revenue : BigDecimal.ZERO;
     }
 
     /**
@@ -571,7 +549,7 @@ public class EventService {
     @Transactional(readOnly = true)
     public Page<com.MyBooking.event.dto.EventResponseDto> searchEventsAsDto(com.MyBooking.event.dto.EventSearchCriteriaDto criteria, Pageable pageable) {
         Page<Event> events = searchEvents(criteria.getName(), criteria.getEventType(), criteria.getInstallationId(), 
-                                        criteria.getMinPrice(), criteria.getMaxPrice(), "EUR", 
+                                        criteria.getMinPrice(), criteria.getMaxPrice(), null, 
                                         criteria.getMinCapacity(), pageable);
         return events.map(this::convertToResponseDto);
     }
@@ -581,9 +559,8 @@ public class EventService {
      */
     @Transactional(readOnly = true)
     public Page<com.MyBooking.event.dto.EventResponseDto> getUpcomingEventsAsDto(Pageable pageable) {
-        // For now, get all events and filter - in a real app, this should be a repository method
-        Page<Event> allEvents = getAllEvents(pageable);
-        return allEvents.map(this::convertToResponseDto);
+        Page<Event> upcomingEvents = eventRepository.findByStartAtGreaterThanEqual(LocalDateTime.now(), pageable);
+        return upcomingEvents.map(this::convertToResponseDto);
     }
     
     /**

@@ -445,16 +445,15 @@ class EventServiceTest {
         Event futureEvent = new Event();
         futureEvent.setStartAt(LocalDateTime.now().plusDays(1));
 
-        when(eventRepository.findAll()).thenReturn(Arrays.asList(pastEvent, futureEvent, testEvent));
+        when(eventRepository.findByStartAtGreaterThanEqual(any(LocalDateTime.class)))
+            .thenReturn(Arrays.asList(futureEvent, testEvent));
 
         // When
         List<Event> result = eventService.getUpcomingEvents();
 
         // Then
-        assertThat(result).hasSize(2); // Only future events
-        assertThat(result).allMatch(event -> !event.getStartAt().isBefore(LocalDateTime.now()));
-
-        verify(eventRepository).findAll();
+        assertThat(result).hasSize(2);
+        verify(eventRepository).findByStartAtGreaterThanEqual(any(LocalDateTime.class));
     }
 
     // ========== STATISTICS & ANALYTICS TESTS ==========
@@ -462,15 +461,9 @@ class EventServiceTest {
     @Test
     void getEventStatistics_ShouldReturnCorrectStatistics() {
         // Given
-        Event pastEvent = new Event();
-        pastEvent.setStartAt(LocalDateTime.now().minusDays(1));
-        pastEvent.setPrice(new BigDecimal("100.00"));
-
-        Event futureEvent = new Event();
-        futureEvent.setStartAt(LocalDateTime.now().plusDays(1));
-        futureEvent.setPrice(new BigDecimal("200.00"));
-
-        when(eventRepository.findAll()).thenReturn(Arrays.asList(pastEvent, futureEvent, testEvent));
+        when(eventRepository.count()).thenReturn(3L);
+        when(eventRepository.countUpcomingEvents(any(LocalDateTime.class))).thenReturn(2L);
+        when(eventRepository.getTotalEventRevenue()).thenReturn(new BigDecimal("530.00"));
 
         // When
         EventService.EventStatistics result = eventService.getEventStatistics();
@@ -479,24 +472,18 @@ class EventServiceTest {
         assertThat(result.getTotalEvents()).isEqualTo(3);
         assertThat(result.getUpcomingEvents()).isEqualTo(2);
         assertThat(result.getPastEvents()).isEqualTo(1);
-        assertThat(result.getTotalRevenue()).isEqualTo(new BigDecimal("530.00")); // 100 + 200 + 230
+        assertThat(result.getTotalRevenue()).isEqualTo(new BigDecimal("530.00"));
         assertThat(result.getAveragePrice()).isEqualTo(new BigDecimal("176.67"));
 
-        verify(eventRepository).findAll();
+        verify(eventRepository).count();
+        verify(eventRepository).countUpcomingEvents(any(LocalDateTime.class));
+        verify(eventRepository).getTotalEventRevenue();
     }
 
     @Test
     void getRevenueByCurrency_ShouldReturnCorrectRevenue() {
         // Given
-        Event usdEvent1 = new Event();
-        usdEvent1.setCurrency("USD");
-        usdEvent1.setPrice(new BigDecimal("100.00"));
-
-        Event usdEvent2 = new Event();
-        usdEvent2.setCurrency("USD");
-        usdEvent2.setPrice(new BigDecimal("200.00"));
-
-        when(eventRepository.findByCurrency("USD")).thenReturn(Arrays.asList(usdEvent1, usdEvent2));
+        when(eventRepository.getRevenueByCurrency("USD")).thenReturn(new BigDecimal("300.00"));
 
         // When
         BigDecimal result = eventService.getRevenueByCurrency("USD");
@@ -504,7 +491,7 @@ class EventServiceTest {
         // Then
         assertThat(result).isEqualTo(new BigDecimal("300.00"));
 
-        verify(eventRepository).findByCurrency("USD");
+        verify(eventRepository).getRevenueByCurrency("USD");
     }
 
     // ========== BUSINESS OPERATIONS TESTS ==========

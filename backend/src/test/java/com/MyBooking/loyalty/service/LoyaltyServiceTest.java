@@ -285,7 +285,7 @@ class LoyaltyServiceTest {
         LoyaltyTransaction savedTransaction = new LoyaltyTransaction();
         savedTransaction.setId(1L);
 
-        when(loyaltyAccountRepository.findByUserId(1L)).thenReturn(Optional.of(testAccount));
+        when(loyaltyAccountRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testAccount));
         when(loyaltyTransactionRepository.save(any(LoyaltyTransaction.class))).thenReturn(savedTransaction);
         when(loyaltyAccountRepository.save(any(LoyaltyAccount.class))).thenReturn(testAccount);
 
@@ -296,7 +296,7 @@ class LoyaltyServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getId()).isEqualTo(1L);
 
-        verify(loyaltyAccountRepository).findByUserId(1L);
+        verify(loyaltyAccountRepository).findByUserIdForUpdate(1L);
         verify(loyaltyTransactionRepository).save(any(LoyaltyTransaction.class));
         verify(loyaltyAccountRepository).save(any(LoyaltyAccount.class));
     }
@@ -307,14 +307,14 @@ class LoyaltyServiceTest {
         Integer points = 2000; // More than available balance
         testAccount.setBalance(1000);
 
-        when(loyaltyAccountRepository.findByUserId(1L)).thenReturn(Optional.of(testAccount));
+        when(loyaltyAccountRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testAccount));
 
         // When & Then
         assertThatThrownBy(() -> loyaltyService.redeemPoints(1L, points, "Test"))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Insufficient points");
 
-        verify(loyaltyAccountRepository).findByUserId(1L);
+        verify(loyaltyAccountRepository).findByUserIdForUpdate(1L);
         verify(loyaltyTransactionRepository, never()).save(any());
     }
 

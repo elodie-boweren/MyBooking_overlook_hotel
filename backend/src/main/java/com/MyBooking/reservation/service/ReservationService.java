@@ -63,8 +63,8 @@ public class ReservationService {
         // Validate inputs
         validateReservationInputs(checkIn, checkOut, numberOfGuests, currency);
         
-        // Get and validate room
-        Room room = roomRepository.findById(roomId)
+        // Get and validate room with pessimistic write lock to serialize concurrent bookings
+        Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + roomId));
         
         // Get and validate client
@@ -119,6 +119,10 @@ public class ReservationService {
             throw new BusinessRuleException("All reservation parameters are required");
         }
 
+        if (checkIn.isBefore(LocalDate.now())) {
+            throw new BusinessRuleException("Check-in date cannot be in the past");
+        }
+
         if (checkOut.isBefore(checkIn) || checkOut.isEqual(checkIn)) {
             throw new BusinessRuleException("Check-out date must be after check-in date");
         }
@@ -131,8 +135,8 @@ public class ReservationService {
             throw new BusinessRuleException("Currency must be exactly 3 characters");
         }
 
-        // Get and validate room
-        Room room = roomRepository.findById(roomId)
+        // Get and validate room with pessimistic write lock to serialize concurrent bookings
+        Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + roomId));
 
         // Validate room capacity
@@ -140,6 +144,9 @@ public class ReservationService {
         
         // Validate room operational status
         validateRoomOperationalStatus(room);
+
+        // Check room availability (INV-RES-001)
+        checkRoomAvailability(roomId, checkIn, checkOut);
 
         // Get and validate client
         User client = userRepository.findById(clientId)
@@ -356,12 +363,16 @@ public class ReservationService {
         
         // Validate new inputs
         validateReservationInputs(newCheckIn, newCheckOut, newNumberOfGuests, currency);
+
+        // Acquire pessimistic lock on room to serialize concurrent date updates
+        Room room = roomRepository.findByIdForUpdate(reservation.getRoom().getId())
+            .orElseThrow(() -> new NotFoundException("Room not found with ID: " + reservation.getRoom().getId()));
         
         // Validate room capacity for new guest count
-        validateRoomCapacity(reservation.getRoom(), newNumberOfGuests);
+        validateRoomCapacity(room, newNumberOfGuests);
         
         // Check availability for new dates (excluding current reservation)
-        checkRoomAvailabilityForUpdate(reservation.getRoom().getId(), newCheckIn, newCheckOut, reservationId);
+        checkRoomAvailabilityForUpdate(room.getId(), newCheckIn, newCheckOut, reservationId);
         
         // Update reservation
         reservation.setCheckIn(newCheckIn);
@@ -381,7 +392,8 @@ public class ReservationService {
      */
     @Transactional
     public void cancelReservation(Long reservationId, String reason) {
-        Reservation reservation = getReservationById(reservationId);
+        Reservation reservation = reservationRepository.findByIdForUpdate(reservationId)
+            .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + reservationId));
         
         if (reservation.getStatus() == ReservationStatus.CANCELLED) {
             throw new BusinessRuleException("Reservation is already cancelled");
@@ -435,15 +447,7 @@ public class ReservationService {
      */
     @Transactional(readOnly = true)
     public List<Room> getAvailableRooms(LocalDate checkIn, LocalDate checkOut, Integer numberOfGuests) {
-        // Get all rooms from the system
-        List<Room> allRooms = roomRepository.findAll();
-        
-        // Filter by operational readiness, capacity and calendar availability
-        return allRooms.stream()
-            .filter(room -> room.getStatus() != RoomStatus.OUT_OF_SERVICE)
-            .filter(room -> room.getCapacity() >= numberOfGuests)
-            .filter(room -> isRoomAvailable(room.getId(), checkIn, checkOut))
-            .toList();
+        return roomRepository.findAvailableRooms(checkIn, checkOut, numberOfGuests);
     }
 
     /**
@@ -758,8 +762,8 @@ public class ReservationService {
     public ReservationResponseDto reassignReservation(Long id, Long newRoomId) {
         Reservation reservation = getReservationById(id);
         
-        // Validate new room
-        Room newRoom = roomRepository.findById(newRoomId)
+        // Validate new room with pessimistic write lock
+        Room newRoom = roomRepository.findByIdForUpdate(newRoomId)
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + newRoomId));
         
         // Validate new room capacity and operational status

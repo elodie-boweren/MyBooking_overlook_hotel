@@ -14,6 +14,7 @@ import com.MyBooking.employee.repository.EmployeeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -239,19 +240,7 @@ public class AnnouncementService {
      */
     @Transactional(readOnly = true)
     public Page<Announcement> searchAnnouncements(String searchTerm, Pageable pageable) {
-        // Search in title first
-        Page<Announcement> titleResults = announcementRepository.findByTitleContainingIgnoreCase(searchTerm, pageable);
-        
-        // Search in content
-        Page<Announcement> contentResults = announcementRepository.findByContentContainingIgnoreCase(searchTerm, pageable);
-        
-        // Combine and deduplicate results
-        List<Announcement> combinedResults = titleResults.getContent();
-        contentResults.getContent().stream()
-            .filter(announcement -> !combinedResults.contains(announcement))
-            .forEach(combinedResults::add);
-        
-        return new PageImpl<>(combinedResults, pageable, combinedResults.size());
+        return announcementRepository.searchByTitleOrContent(searchTerm, pageable);
     }
 
     /**
@@ -285,17 +274,7 @@ public class AnnouncementService {
      */
     @Transactional(readOnly = true)
     public List<Announcement> getMostRepliedAnnouncements(int limit) {
-        // Get all announcements and sort by reply count
-        List<Announcement> allAnnouncements = announcementRepository.findAll();
-        
-        return allAnnouncements.stream()
-            .sorted((a1, a2) -> {
-                long replies1 = announcementReplyRepository.countByAnnouncement(a1);
-                long replies2 = announcementReplyRepository.countByAnnouncement(a2);
-                return Long.compare(replies2, replies1); // Descending order
-            })
-            .limit(limit)
-            .toList();
+        return announcementRepository.findMostRepliedAnnouncements(PageRequest.of(0, limit));
     }
 
     // ==================== STATISTICS AND ANALYTICS ====================

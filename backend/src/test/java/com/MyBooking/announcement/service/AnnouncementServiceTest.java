@@ -520,13 +520,10 @@ class AnnouncementServiceTest {
     void searchAnnouncements_ShouldReturnMatchingAnnouncements() {
         // Given
         Pageable pageable = PageRequest.of(0, 10);
-        Page<Announcement> titleResults = new PageImpl<>(Arrays.asList(testAnnouncement));
-        Page<Announcement> contentResults = new PageImpl<>(Arrays.asList(testAnnouncement));
-        
-        when(announcementRepository.findByTitleContainingIgnoreCase("test", pageable))
-            .thenReturn(titleResults);
-        when(announcementRepository.findByContentContainingIgnoreCase("test", pageable))
-            .thenReturn(contentResults);
+        Page<Announcement> searchResults = new PageImpl<>(Arrays.asList(testAnnouncement));
+
+        when(announcementRepository.searchByTitleOrContent("test", pageable))
+            .thenReturn(searchResults);
 
         // When
         Page<Announcement> result = announcementService.searchAnnouncements("test", pageable);
@@ -536,8 +533,7 @@ class AnnouncementServiceTest {
         assertThat(result.getContent()).hasSize(1);
         assertThat(result.getContent().get(0)).isEqualTo(testAnnouncement);
 
-        verify(announcementRepository).findByTitleContainingIgnoreCase("test", pageable);
-        verify(announcementRepository).findByContentContainingIgnoreCase("test", pageable);
+        verify(announcementRepository).searchByTitleOrContent("test", pageable);
     }
 
     @Test
@@ -598,9 +594,8 @@ class AnnouncementServiceTest {
     @Test
     void getMostRepliedAnnouncements_ShouldReturnAnnouncementsSortedByReplyCount() {
         // Given
-        when(announcementRepository.findAll()).thenReturn(Arrays.asList(testAnnouncement, testArchivedAnnouncement));
-        when(announcementReplyRepository.countByAnnouncement(testAnnouncement)).thenReturn(5L);
-        when(announcementReplyRepository.countByAnnouncement(testArchivedAnnouncement)).thenReturn(2L);
+        when(announcementRepository.findMostRepliedAnnouncements(any()))
+            .thenReturn(Arrays.asList(testAnnouncement, testArchivedAnnouncement));
 
         // When
         List<Announcement> result = announcementService.getMostRepliedAnnouncements(2);
@@ -608,12 +603,10 @@ class AnnouncementServiceTest {
         // Then
         assertThat(result).isNotNull();
         assertThat(result).hasSize(2);
-        assertThat(result.get(0)).isEqualTo(testAnnouncement); // Most replies
-        assertThat(result.get(1)).isEqualTo(testArchivedAnnouncement); // Fewer replies
+        assertThat(result.get(0)).isEqualTo(testAnnouncement);
+        assertThat(result.get(1)).isEqualTo(testArchivedAnnouncement);
 
-        verify(announcementRepository).findAll();
-        verify(announcementReplyRepository).countByAnnouncement(testAnnouncement);
-        verify(announcementReplyRepository).countByAnnouncement(testArchivedAnnouncement);
+        verify(announcementRepository).findMostRepliedAnnouncements(any());
     }
 
     // ==================== STATISTICS TESTS ====================

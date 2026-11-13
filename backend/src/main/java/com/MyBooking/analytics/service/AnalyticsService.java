@@ -375,8 +375,8 @@ public class AnalyticsService {
     }
 
     private long getTotalActiveCustomers() {
-        // Get count of users with CLIENT role
-        return authService.getUsersByRole(Role.CLIENT).size();
+        // Get count of users with CLIENT role without loading entities into heap
+        return authService.countUsersByRole(Role.CLIENT);
     }
 
     private long getActiveLoyaltyUsersCount() {

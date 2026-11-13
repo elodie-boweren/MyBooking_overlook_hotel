@@ -3,9 +3,11 @@ package com.MyBooking.room.repository;
 import com.MyBooking.room.domain.Room;
 import com.MyBooking.room.domain.RoomStatus;
 import com.MyBooking.room.domain.RoomType;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -22,6 +24,10 @@ import java.util.Optional;
  */
 @Repository
 public interface RoomRepository extends JpaRepository<Room, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT r FROM Room r WHERE r.id = :id")
+    Optional<Room> findByIdForUpdate(@Param("id") Long id);
 
     /**
      * Find room by room number.
@@ -334,4 +340,15 @@ public interface RoomRepository extends JpaRepository<Room, Long> {
      */
     @Query("SELECT r FROM Room r ORDER BY r.price DESC, id ASC LIMIT 1")
     Optional<Room> findMostExpensiveRoom();
+
+    @Query("SELECT r FROM Room r WHERE r.status <> com.MyBooking.room.domain.RoomStatus.OUT_OF_SERVICE " +
+           "AND r.capacity >= :numberOfGuests " +
+           "AND NOT EXISTS (" +
+           "  SELECT res FROM Reservation res WHERE res.room = r " +
+           "  AND res.status = com.MyBooking.reservation.domain.ReservationStatus.CONFIRMED " +
+           "  AND res.checkIn < :checkOut AND res.checkOut > :checkIn" +
+           ")")
+    List<Room> findAvailableRooms(@Param("checkIn") LocalDate checkIn,
+                                  @Param("checkOut") LocalDate checkOut,
+                                  @Param("numberOfGuests") Integer numberOfGuests);
 }

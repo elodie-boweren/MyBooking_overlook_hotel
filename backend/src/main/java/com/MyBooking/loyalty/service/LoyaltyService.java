@@ -128,8 +128,9 @@ public class LoyaltyService {
             throw new BusinessRuleException("Amount must be positive");
         }
 
-        // Get or create loyalty account
-        LoyaltyAccount account = getOrCreateLoyaltyAccount(userId);
+        // Get or create loyalty account with pessimistic write lock
+        LoyaltyAccount account = loyaltyAccountRepository.findByUserIdForUpdate(userId)
+            .orElseGet(() -> getOrCreateLoyaltyAccount(userId));
 
         // Calculate points (1 point per $1 spent)
         Integer points = calculatePointsFromAmount(amount);
@@ -158,8 +159,9 @@ public class LoyaltyService {
             throw new BusinessRuleException("Points must be positive");
         }
 
-        // Get loyalty account
-        LoyaltyAccount account = getLoyaltyAccountByUserId(userId);
+        // Get loyalty account with pessimistic write lock
+        LoyaltyAccount account = loyaltyAccountRepository.findByUserIdForUpdate(userId)
+            .orElseThrow(() -> new NotFoundException("Loyalty account not found for user ID: " + userId));
 
         // Validate redemption
         validateRedemptionRequest(account, points);
@@ -211,10 +213,7 @@ public class LoyaltyService {
     public List<LoyaltyTransaction> getRecentTransactions(Long userId, int days) {
         LoyaltyAccount account = getLoyaltyAccountByUserId(userId);
         LocalDateTime since = LocalDateTime.now().minusDays(days);
-        return loyaltyTransactionRepository.findByAccountIdOrderByCreatedAtDesc(account.getId())
-            .stream()
-            .filter(transaction -> transaction.getCreatedAt().isAfter(since))
-            .toList();
+        return loyaltyTransactionRepository.findByAccountIdAndCreatedAtAfterOrderByCreatedAtDesc(account.getId(), since);
     }
 
     // ========== BUSINESS OPERATIONS ==========
@@ -480,7 +479,8 @@ public class LoyaltyService {
             throw new BusinessRuleException("Reservation has no associated client");
         }
 
-        LoyaltyAccount account = getOrCreateLoyaltyAccount(reservation.getClient().getId());
+        LoyaltyAccount account = loyaltyAccountRepository.findByUserIdForUpdate(reservation.getClient().getId())
+            .orElseGet(() -> getOrCreateLoyaltyAccount(reservation.getClient().getId()));
 
         // Create REFUND transaction directly restoring points 1:1
         LoyaltyTransaction transaction = new LoyaltyTransaction(account, LoyaltyTxType.REFUND, pointsUsed, reservation);
@@ -522,7 +522,8 @@ public class LoyaltyService {
             return null; // No earned points to claw back
         }
 
-        LoyaltyAccount account = getOrCreateLoyaltyAccount(reservation.getClient().getId());
+        LoyaltyAccount account = loyaltyAccountRepository.findByUserIdForUpdate(reservation.getClient().getId())
+            .orElseGet(() -> getOrCreateLoyaltyAccount(reservation.getClient().getId()));
 
         // Create CLAWBACK transaction
         LoyaltyTransaction transaction = new LoyaltyTransaction(account, LoyaltyTxType.CLAWBACK, totalEarnedPoints, reservation);

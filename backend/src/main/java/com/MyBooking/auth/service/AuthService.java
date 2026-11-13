@@ -200,6 +200,11 @@ public class AuthService {
         return userRepository.findByRole(role);
     }
 
+    @Transactional(readOnly = true)
+    public long countUsersByRole(Role role) {
+        return userRepository.countByRole(role);
+    }
+
     /**
      * Get user by ID (Admin only)
      */

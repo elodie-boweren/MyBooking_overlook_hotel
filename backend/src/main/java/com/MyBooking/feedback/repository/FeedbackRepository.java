@@ -186,4 +186,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, Long> {
     // Get rating distribution
     @Query("SELECT f.rating, COUNT(f) FROM Feedback f GROUP BY f.rating ORDER BY f.rating")
     List<Object[]> getRatingDistribution();
+
+    @Query("SELECT COUNT(f) FROM Feedback f WHERE f.comment IS NOT NULL AND TRIM(f.comment) <> ''")
+    long countFeedbacksWithComments();
 }

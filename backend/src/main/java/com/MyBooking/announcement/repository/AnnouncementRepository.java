@@ -202,4 +202,11 @@ public interface AnnouncementRepository extends JpaRepository<Announcement, Long
             @Param("role") Role role,
             @Param("status") AnnouncementStatus status,
             Pageable pageable);
+
+    @Query("SELECT a FROM Announcement a WHERE LOWER(a.title) LIKE LOWER(CONCAT('%', :searchTerm, '%')) " +
+           "OR LOWER(a.content) LIKE LOWER(CONCAT('%', :searchTerm, '%'))")
+    Page<Announcement> searchByTitleOrContent(@Param("searchTerm") String searchTerm, Pageable pageable);
+
+    @Query("SELECT a FROM Announcement a ORDER BY (SELECT COUNT(r) FROM AnnouncementReply r WHERE r.announcement = a) DESC, a.createdAt DESC")
+    List<Announcement> findMostRepliedAnnouncements(Pageable pageable);
 }

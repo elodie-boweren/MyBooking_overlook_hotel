@@ -5,6 +5,7 @@ import com.MyBooking.announcement.domain.AnnouncementPriority;
 import com.MyBooking.announcement.domain.AnnouncementStatus;
 import com.MyBooking.auth.domain.Role;
 import com.MyBooking.auth.domain.User;
+import com.MyBooking.employee.domain.Department;
 import com.MyBooking.hotel_management.HotelManagementApplication;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -537,5 +538,33 @@ class AnnouncementRepositoryTest {
         
         boolean exists = announcementRepository.existsByCreatedBy(nonExistentUser);
         assertThat(exists).isFalse();
+    }
+
+    @Test
+    void testFindVisibleAnnouncementsForAudience() {
+        Announcement housekeepingOnly = new Announcement(
+                "Housekeeping Briefing", "Inspect rooms 200-210", admin1,
+                AnnouncementPriority.HIGH, AnnouncementStatus.PUBLISHED,
+                Department.HOUSEKEEPING, Role.EMPLOYEE);
+        Announcement maintenanceOnly = new Announcement(
+                "Boiler Maintenance", "Check pressure valve", admin1,
+                AnnouncementPriority.MEDIUM, AnnouncementStatus.PUBLISHED,
+                Department.MAINTENANCE, Role.EMPLOYEE);
+        Announcement adminOnly = new Announcement(
+                "Executive Review", "Q4 budget", admin1,
+                AnnouncementPriority.LOW, AnnouncementStatus.PUBLISHED,
+                Department.ALL, Role.ADMIN);
+
+        entityManager.persistAndFlush(housekeepingOnly);
+        entityManager.persistAndFlush(maintenanceOnly);
+        entityManager.persistAndFlush(adminOnly);
+
+        Page<Announcement> housekeepingVisible = announcementRepository.findVisibleAnnouncementsForAudience(
+                Department.HOUSEKEEPING, Role.EMPLOYEE, AnnouncementStatus.PUBLISHED, PageRequest.of(0, 20));
+
+        assertThat(housekeepingVisible.getContent())
+                .extracting(Announcement::getTitle)
+                .contains("Housekeeping Briefing")
+                .doesNotContain("Boiler Maintenance", "Executive Review");
     }
 }

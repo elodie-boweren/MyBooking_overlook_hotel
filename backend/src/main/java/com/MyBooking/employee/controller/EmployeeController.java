@@ -166,6 +166,7 @@ public class EmployeeController {
                 employee.getUser().getLastName(),
                 employee.getStatus(),
                 employee.getJobTitle(),
+                employee.getDepartment(),
                 employee.getCreatedAt(),
                 employee.getUpdatedAt()
         );

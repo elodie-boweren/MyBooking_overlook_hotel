@@ -9,7 +9,9 @@ import org.springframework.stereotype.Repository;
 import com.MyBooking.announcement.domain.Announcement;
 import com.MyBooking.announcement.domain.AnnouncementPriority;
 import com.MyBooking.announcement.domain.AnnouncementStatus;
+import com.MyBooking.auth.domain.Role;
 import com.MyBooking.auth.domain.User;
+import com.MyBooking.employee.domain.Department;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -188,4 +190,16 @@ public interface AnnouncementRepository extends JpaRepository<Announcement, Long
     // Get announcement count by created by user
     @Query("SELECT a.createdBy.id, COUNT(a) FROM Announcement a GROUP BY a.createdBy.id")
     List<Object[]> getAnnouncementCountByCreatedBy();
+
+    // ==================== AUDIENCE SCOPING QUERIES ====================
+
+    @Query("SELECT a FROM Announcement a WHERE a.status = :status " +
+           "AND (a.targetDepartment = com.MyBooking.employee.domain.Department.ALL OR a.targetDepartment = :department) " +
+           "AND (a.targetRole IS NULL OR a.targetRole = :role) " +
+           "ORDER BY CASE a.priority WHEN 'HIGH' THEN 1 WHEN 'MEDIUM' THEN 2 ELSE 3 END, a.createdAt DESC")
+    Page<Announcement> findVisibleAnnouncementsForAudience(
+            @Param("department") Department department,
+            @Param("role") Role role,
+            @Param("status") AnnouncementStatus status,
+            Pageable pageable);
 }

@@ -1,15 +1,21 @@
 package com.MyBooking.announcement.service;
 
+import com.MyBooking.auth.domain.Role;
 import com.MyBooking.auth.domain.User;
 import com.MyBooking.auth.repository.UserRepository;
 import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
 import com.MyBooking.announcement.domain.*;
+import com.MyBooking.announcement.dto.*;
 import com.MyBooking.announcement.repository.*;
+import com.MyBooking.employee.domain.Department;
+import com.MyBooking.employee.domain.Employee;
+import com.MyBooking.employee.repository.EmployeeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,6 +36,9 @@ public class AnnouncementService {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private EmployeeRepository employeeRepository;
+
     // ==================== ANNOUNCEMENT MANAGEMENT ====================
 
     /**
@@ -37,13 +46,21 @@ public class AnnouncementService {
      */
     public Announcement createAnnouncement(Long createdByUserId, String title, String content, 
                                          AnnouncementPriority priority) {
-        // Validate user exists
+        return createAnnouncement(createdByUserId, title, content, priority, Department.ALL, null);
+    }
+
+    /**
+     * Create and publish a new announcement with audience scoping
+     */
+    public Announcement createAnnouncement(Long createdByUserId, String title, String content,
+                                         AnnouncementPriority priority, Department targetDepartment, Role targetRole) {
         User createdBy = userRepository.findById(createdByUserId)
             .orElseThrow(() -> new NotFoundException("User not found with ID: " + createdByUserId));
 
-        // Create announcement (always published immediately)
-        Announcement announcement = new Announcement(title, content, createdBy, priority, AnnouncementStatus.PUBLISHED);
-        
+        Department effectiveDepartment = targetDepartment != null ? targetDepartment : Department.ALL;
+        Announcement announcement = new Announcement(
+                title, content, createdBy, priority, AnnouncementStatus.PUBLISHED, effectiveDepartment, targetRole);
+
         return announcementRepository.save(announcement);
     }
 
@@ -322,6 +339,150 @@ public class AnnouncementService {
             .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
         
         return announcementRepository.findByCreatedByOrderByCreatedAtDesc(user);
+    }
+
+    // ==================== AUDIENCE SCOPING & DTO WRAPPERS ====================
+
+    /**
+     * Get published announcements visible to a specific user based on role and department.
+     */
+    @Transactional(readOnly = true)
+    public Page<Announcement> getVisibleAnnouncementsForUser(Long userId, Pageable pageable) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+
+        if (user.getRole() == Role.ADMIN) {
+            return announcementRepository.findByStatus(AnnouncementStatus.PUBLISHED, pageable);
+        }
+
+        Department department = resolveUserDepartment(userId);
+        return announcementRepository.findVisibleAnnouncementsForAudience(
+                department, user.getRole(), AnnouncementStatus.PUBLISHED, pageable);
+    }
+
+    public AnnouncementResponseDto createAnnouncementAsDto(Long createdByUserId, AnnouncementCreateRequestDto request) {
+        Announcement created = createAnnouncement(
+                createdByUserId,
+                request.getTitle(),
+                request.getContent(),
+                request.getPriority(),
+                request.getTargetDepartment(),
+                request.getTargetRole()
+        );
+        return toAnnouncementDto(created);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AnnouncementResponseDto> getVisibleAnnouncementsForUserAsDto(Long userId, Pageable pageable) {
+        return getVisibleAnnouncementsForUser(userId, pageable).map(this::toAnnouncementDto);
+    }
+
+    @Transactional(readOnly = true)
+    public AnnouncementResponseDto getAnnouncementByIdForUserAsDto(Long announcementId, Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+        Announcement announcement = getAnnouncementById(announcementId);
+
+        assertUserCanAccessAnnouncement(user, announcement);
+        return toAnnouncementDto(announcement);
+    }
+
+    public AnnouncementResponseDto updateAnnouncementAsDto(Long announcementId, AnnouncementUpdateRequestDto request) {
+        Announcement updated = updateAnnouncement(
+                announcementId, request.getTitle(), request.getContent(), request.getPriority());
+        return toAnnouncementDto(updated);
+    }
+
+    public AnnouncementResponseDto archiveAnnouncementAsDto(Long announcementId) {
+        Announcement archived = archiveAnnouncement(announcementId);
+        return toAnnouncementDto(archived);
+    }
+
+    public AnnouncementReplyResponseDto addReplyAsDto(Long announcementId, Long userId, AnnouncementReplyRequestDto request) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+        Announcement announcement = getAnnouncementById(announcementId);
+        assertUserCanAccessAnnouncement(user, announcement);
+
+        AnnouncementReply reply = addReply(announcementId, userId, request.getMessage());
+        return toReplyDto(reply);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AnnouncementReplyResponseDto> getRepliesAsDto(Long announcementId, Long userId) {
+        User user = userRepository.findById(userId)
+            .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+        Announcement announcement = getAnnouncementById(announcementId);
+        assertUserCanAccessAnnouncement(user, announcement);
+
+        return announcementReplyRepository.findByAnnouncementOrderByCreatedAtAsc(announcement)
+                .stream()
+                .map(this::toReplyDto)
+                .toList();
+    }
+
+    private Department resolveUserDepartment(Long userId) {
+        if (employeeRepository == null) {
+            return Department.ALL;
+        }
+        return employeeRepository.findByUserId(userId)
+                .map(Employee::getDepartment)
+                .orElse(Department.ALL);
+    }
+
+    private void assertUserCanAccessAnnouncement(User user, Announcement announcement) {
+        if (user.getRole() == Role.ADMIN) {
+            return;
+        }
+        if (announcement.getStatus() != AnnouncementStatus.PUBLISHED) {
+            throw new AccessDeniedException("Announcement is not accessible");
+        }
+        Department userDepartment = resolveUserDepartment(user.getId());
+        Department targetDepartment = announcement.getTargetDepartment();
+        boolean departmentMatches = targetDepartment == null
+                || targetDepartment == Department.ALL
+                || targetDepartment == userDepartment;
+        boolean roleMatches = announcement.getTargetRole() == null
+                || announcement.getTargetRole() == user.getRole();
+
+        if (!departmentMatches || !roleMatches) {
+            throw new AccessDeniedException("You do not have access to this announcement");
+        }
+    }
+
+    private AnnouncementResponseDto toAnnouncementDto(Announcement announcement) {
+        User creator = announcement.getCreatedBy();
+        String creatorName = creator != null
+                ? (creator.getFirstName() + " " + creator.getLastName()).trim()
+                : "";
+        return new AnnouncementResponseDto(
+                announcement.getId(),
+                announcement.getTitle(),
+                announcement.getContent(),
+                creator != null ? creator.getId() : null,
+                creatorName,
+                announcement.getPriority(),
+                announcement.getStatus(),
+                announcement.getTargetDepartment(),
+                announcement.getTargetRole(),
+                announcement.getCreatedAt(),
+                announcement.getUpdatedAt()
+        );
+    }
+
+    private AnnouncementReplyResponseDto toReplyDto(AnnouncementReply reply) {
+        User author = reply.getUser();
+        String authorName = author != null
+                ? (author.getFirstName() + " " + author.getLastName()).trim()
+                : "";
+        return new AnnouncementReplyResponseDto(
+                reply.getId(),
+                reply.getAnnouncement() != null ? reply.getAnnouncement().getId() : null,
+                author != null ? author.getId() : null,
+                authorName,
+                reply.getMessage(),
+                reply.getCreatedAt()
+        );
     }
 }
 

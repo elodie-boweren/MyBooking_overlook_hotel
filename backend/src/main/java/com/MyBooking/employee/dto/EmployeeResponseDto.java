@@ -1,5 +1,6 @@
 package com.MyBooking.employee.dto;
 
+import com.MyBooking.employee.domain.Department;
 import com.MyBooking.employee.domain.EmployeeStatus;
 import java.time.LocalDateTime;
 
@@ -10,6 +11,7 @@ public class EmployeeResponseDto {
     private String lastName;
     private EmployeeStatus status;
     private String jobTitle;
+    private Department department;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -18,12 +20,19 @@ public class EmployeeResponseDto {
 
     public EmployeeResponseDto(Long userId, String email, String firstName, String lastName, 
                               EmployeeStatus status, String jobTitle, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        this(userId, email, firstName, lastName, status, jobTitle, Department.ALL, createdAt, updatedAt);
+    }
+
+    public EmployeeResponseDto(Long userId, String email, String firstName, String lastName, 
+                              EmployeeStatus status, String jobTitle, Department department,
+                              LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.userId = userId;
         this.email = email;
         this.firstName = firstName;
         this.lastName = lastName;
         this.status = status;
         this.jobTitle = jobTitle;
+        this.department = department != null ? department : Department.ALL;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
@@ -46,6 +55,9 @@ public class EmployeeResponseDto {
 
     public String getJobTitle() { return jobTitle; }
     public void setJobTitle(String jobTitle) { this.jobTitle = jobTitle; }
+
+    public Department getDepartment() { return department; }
+    public void setDepartment(Department department) { this.department = department; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

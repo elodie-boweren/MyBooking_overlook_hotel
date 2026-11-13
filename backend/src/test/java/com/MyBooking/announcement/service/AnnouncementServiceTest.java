@@ -3,10 +3,15 @@ package com.MyBooking.announcement.service;
 import com.MyBooking.announcement.domain.*;
 import com.MyBooking.announcement.repository.AnnouncementRepository;
 import com.MyBooking.announcement.repository.AnnouncementReplyRepository;
+import com.MyBooking.auth.domain.Role;
 import com.MyBooking.auth.domain.User;
 import com.MyBooking.auth.repository.UserRepository;
 import com.MyBooking.common.exception.BusinessRuleException;
 import com.MyBooking.common.exception.NotFoundException;
+import com.MyBooking.employee.domain.Department;
+import com.MyBooking.employee.domain.Employee;
+import com.MyBooking.employee.domain.EmployeeStatus;
+import com.MyBooking.employee.repository.EmployeeRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +43,9 @@ class AnnouncementServiceTest {
 
     @Mock
     private UserRepository userRepository;
+
+    @Mock
+    private EmployeeRepository employeeRepository;
 
     @InjectMocks
     private AnnouncementService announcementService;
@@ -677,5 +685,56 @@ class AnnouncementServiceTest {
 
         verify(userRepository).findById(1L);
         verify(announcementRepository).findByCreatedByOrderByCreatedAtDesc(testUser);
+    }
+
+    @Test
+    void createAnnouncement_WithAudienceScoping_ShouldPersistTargetDepartmentAndRole() {
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(announcementRepository.save(any(Announcement.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        Announcement result = announcementService.createAnnouncement(
+                1L, "Housekeeping Update", "Deep clean floor 3",
+                AnnouncementPriority.HIGH, Department.HOUSEKEEPING, Role.EMPLOYEE);
+
+        assertThat(result.getTargetDepartment()).isEqualTo(Department.HOUSEKEEPING);
+        assertThat(result.getTargetRole()).isEqualTo(Role.EMPLOYEE);
+        assertThat(result.getStatus()).isEqualTo(AnnouncementStatus.PUBLISHED);
+    }
+
+    @Test
+    void getVisibleAnnouncementsForUser_Employee_ShouldScopeByDepartmentAndRole() {
+        testUser2.setRole(Role.EMPLOYEE);
+        Employee emp = new Employee(testUser2, EmployeeStatus.ACTIVE, "Housekeeper", Department.HOUSEKEEPING);
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Announcement> expectedPage = new PageImpl<>(Arrays.asList(testAnnouncement));
+
+        when(userRepository.findById(2L)).thenReturn(Optional.of(testUser2));
+        when(employeeRepository.findByUserId(2L)).thenReturn(Optional.of(emp));
+        when(announcementRepository.findVisibleAnnouncementsForAudience(
+                Department.HOUSEKEEPING, Role.EMPLOYEE, AnnouncementStatus.PUBLISHED, pageable))
+                .thenReturn(expectedPage);
+
+        Page<Announcement> result = announcementService.getVisibleAnnouncementsForUser(2L, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(announcementRepository).findVisibleAnnouncementsForAudience(
+                Department.HOUSEKEEPING, Role.EMPLOYEE, AnnouncementStatus.PUBLISHED, pageable);
+    }
+
+    @Test
+    void getVisibleAnnouncementsForUser_Admin_ShouldReturnAllPublishedAnnouncements() {
+        testUser.setRole(Role.ADMIN);
+        Pageable pageable = PageRequest.of(0, 10);
+        Page<Announcement> expectedPage = new PageImpl<>(Arrays.asList(testAnnouncement));
+
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(announcementRepository.findByStatus(AnnouncementStatus.PUBLISHED, pageable))
+                .thenReturn(expectedPage);
+
+        Page<Announcement> result = announcementService.getVisibleAnnouncementsForUser(1L, pageable);
+
+        assertThat(result.getContent()).hasSize(1);
+        verify(announcementRepository).findByStatus(AnnouncementStatus.PUBLISHED, pageable);
+        verify(employeeRepository, never()).findByUserId(anyLong());
     }
 }

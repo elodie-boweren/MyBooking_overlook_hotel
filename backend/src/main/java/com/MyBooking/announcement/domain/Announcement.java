@@ -1,6 +1,8 @@
 package com.MyBooking.announcement.domain;
 
+import com.MyBooking.auth.domain.Role;
 import com.MyBooking.auth.domain.User;
+import com.MyBooking.employee.domain.Department;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -41,6 +43,15 @@ public class Announcement {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 16)
     private AnnouncementStatus status;
+
+    @NotNull(message = "Target department is required")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_department", nullable = false, length = 32)
+    private Department targetDepartment = Department.ALL;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "target_role", length = 16)
+    private Role targetRole;
     
     
     @CreationTimestamp
@@ -55,11 +66,18 @@ public class Announcement {
     public Announcement() {}
     
     public Announcement(String title, String content, User createdBy, AnnouncementPriority priority, AnnouncementStatus status) {
+        this(title, content, createdBy, priority, status, Department.ALL, null);
+    }
+
+    public Announcement(String title, String content, User createdBy, AnnouncementPriority priority,
+                        AnnouncementStatus status, Department targetDepartment, Role targetRole) {
         this.title = title;
         this.content = content;
         this.createdBy = createdBy;
         this.priority = priority;
         this.status = status;
+        this.targetDepartment = targetDepartment != null ? targetDepartment : Department.ALL;
+        this.targetRole = targetRole;
     }
     
     // Getters and Setters
@@ -80,6 +98,14 @@ public class Announcement {
     
     public AnnouncementStatus getStatus() { return status; }
     public void setStatus(AnnouncementStatus status) { this.status = status; }
+
+    public Department getTargetDepartment() { return targetDepartment; }
+    public void setTargetDepartment(Department targetDepartment) {
+        this.targetDepartment = targetDepartment != null ? targetDepartment : Department.ALL;
+    }
+
+    public Role getTargetRole() { return targetRole; }
+    public void setTargetRole(Role targetRole) { this.targetRole = targetRole; }
     
     
     public LocalDateTime getCreatedAt() { return createdAt; }

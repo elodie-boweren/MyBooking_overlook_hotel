@@ -29,6 +29,11 @@ public class Employee {
     @Size(max = 100, message = "Job title must not exceed 100 characters")
     @Column(name = "job_title", length = 100)
     private String jobTitle;
+
+    @NotNull(message = "Department is required")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "department", nullable = false, length = 32)
+    private Department department = Department.ALL;
     
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -42,9 +47,14 @@ public class Employee {
     public Employee() {}
     
     public Employee(User user, EmployeeStatus status, String jobTitle) {
+        this(user, status, jobTitle, Department.ALL);
+    }
+
+    public Employee(User user, EmployeeStatus status, String jobTitle, Department department) {
         this.user = user;
         this.status = status;
         this.jobTitle = jobTitle;
+        this.department = department != null ? department : Department.ALL;
     }
     
     // Getters and Setters
@@ -59,6 +69,11 @@ public class Employee {
     
     public String getJobTitle() { return jobTitle; }
     public void setJobTitle(String jobTitle) { this.jobTitle = jobTitle; }
+
+    public Department getDepartment() { return department; }
+    public void setDepartment(Department department) {
+        this.department = department != null ? department : Department.ALL;
+    }
     
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

@@ -571,4 +571,18 @@ class RoomServiceTest {
         verify(roomRepository).countByStatus(RoomStatus.OCCUPIED);
         verify(roomRepository).countByStatus(RoomStatus.OUT_OF_SERVICE);
     }
+
+    @Test
+    void updateRoom_ToOutOfServiceWithActiveReservations_ShouldThrowBusinessRuleException() {
+        when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
+        when(reservationRepository.existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(
+                eq(1L), eq(ReservationStatus.CONFIRMED), any(LocalDate.class))).thenReturn(true);
+
+        assertThatThrownBy(() -> roomService.updateRoom(
+                1L, "101", RoomType.SINGLE, new BigDecimal("100.00"), "USD", 2, "Desc", RoomStatus.OUT_OF_SERVICE))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("active or future confirmed reservations");
+
+        verify(roomRepository, never()).save(any());
+    }
 }

@@ -628,7 +628,7 @@ class EventServiceTest {
         booking.setEventDateTime(LocalDateTime.now().plusDays(2));
         booking.setNumberOfParticipants(4);
 
-        when(eventBookingRepository.findById(10L)).thenReturn(Optional.of(booking));
+        when(eventBookingRepository.findByIdForUpdate(10L)).thenReturn(Optional.of(booking));
         when(eventBookingRepository.save(any(EventBooking.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
@@ -639,7 +639,7 @@ class EventServiceTest {
         assertThat(response.getStatus()).isEqualTo(EventBookingStatus.CANCELLED);
         assertThat(booking.getStatus()).isEqualTo(EventBookingStatus.CANCELLED);
 
-        verify(eventBookingRepository).findById(10L);
+        verify(eventBookingRepository).findByIdForUpdate(10L);
         verify(eventBookingRepository).save(booking);
     }
 
@@ -670,7 +670,7 @@ class EventServiceTest {
         testEvent.setCapacity(20);
         testEvent.setStartAt(LocalDateTime.now().plusDays(2));
 
-        when(eventBookingRepository.findById(20L)).thenReturn(Optional.of(booking));
+        when(eventBookingRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(booking));
         when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEvent));
         when(eventBookingRepository.countConfirmedParticipantsByEventId(1L)).thenReturn(15);
 
@@ -702,5 +702,25 @@ class EventServiceTest {
         assertThatThrownBy(() -> eventService.createEventBookingAsDto(request, 1L))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Reservation does not belong to the user");
+    }
+
+    @Test
+    void createEventBookingAsDto_ForSubHourEvent_ShouldSetMinimumOneDurationHour() {
+        EventBookingCreateRequestDto request = new EventBookingCreateRequestDto();
+        request.setEventId(1L);
+        request.setNumberOfParticipants(1);
+
+        testEvent.setStartAt(LocalDateTime.now().plusDays(1));
+        testEvent.setEndAt(testEvent.getStartAt().plusMinutes(30));
+
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testEvent));
+        when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
+        when(eventBookingRepository.countConfirmedParticipantsByEventId(1L)).thenReturn(0);
+        when(eventBookingRepository.save(any(EventBooking.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        EventBookingResponseDto dto = eventService.createEventBookingAsDto(request, 1L);
+
+        assertThat(dto).isNotNull();
+        verify(eventBookingRepository).save(argThat(b -> b.getDurationHours() != null && b.getDurationHours() == 1));
     }
 }

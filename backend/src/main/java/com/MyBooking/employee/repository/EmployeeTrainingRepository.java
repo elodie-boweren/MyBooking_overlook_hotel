@@ -46,6 +46,17 @@ public interface EmployeeTrainingRepository extends JpaRepository<EmployeeTraini
     @Query("SELECT CASE WHEN COUNT(et) > 0 THEN true ELSE false END " +
            "FROM EmployeeTraining et JOIN et.training t " +
            "WHERE et.employee = :employee " +
+           "AND et.status IN (com.MyBooking.employee.domain.TrainingStatus.ASSIGNED, com.MyBooking.employee.domain.TrainingStatus.IN_PROGRESS) " +
+           "AND t.startDate <= :toDate AND t.endDate >= :fromDate")
+    boolean existsOverlappingActiveTraining(
+        @Param("employee") User employee,
+        @Param("fromDate") java.time.LocalDate fromDate,
+        @Param("toDate") java.time.LocalDate toDate
+    );
+
+    @Query("SELECT CASE WHEN COUNT(et) > 0 THEN true ELSE false END " +
+           "FROM EmployeeTraining et JOIN et.training t " +
+           "WHERE et.employee = :employee " +
            "AND et.status = com.MyBooking.employee.domain.TrainingStatus.IN_PROGRESS " +
            "AND t.startDate <= :toDate AND t.endDate >= :fromDate")
     boolean existsOverlappingInProgressTraining(

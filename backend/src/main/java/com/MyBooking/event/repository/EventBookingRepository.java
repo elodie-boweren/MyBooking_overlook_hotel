@@ -9,9 +9,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import jakarta.persistence.LockModeType;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -24,6 +26,10 @@ import java.util.Optional;
  */
 @Repository
 public interface EventBookingRepository extends JpaRepository<EventBooking, Long> {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT eb FROM EventBooking eb WHERE eb.id = :id")
+    Optional<EventBooking> findByIdForUpdate(@Param("id") Long id);
 
     @Override
     @EntityGraph(attributePaths = {"event", "client", "reservation"})

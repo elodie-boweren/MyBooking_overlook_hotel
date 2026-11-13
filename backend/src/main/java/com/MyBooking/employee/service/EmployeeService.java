@@ -159,26 +159,28 @@ public class EmployeeService {
      * Create a new task for an employee
      */
     public EmployeeTask createTask(Long employeeId, String title, String description) {
-        // Validate employee exists and is active
-        Employee employee = getEmployeeByUserId(employeeId);
+        // Validate employee exists and is active (with pessimistic lock to serialize concurrent assignments)
+        Employee employee = employeeRepository.findByUserIdForUpdate(employeeId)
+            .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + employeeId));
         if (employee.getStatus() != EmployeeStatus.ACTIVE) {
             throw new BusinessRuleException("Cannot assign task to inactive employee");
         }
 
-        // Check if employee is in training
-        if (hasInProgressTraining(employeeId)) {
+        LocalDate today = LocalDate.now();
+        User employeeUser = employee.getUser();
+
+        // Check if employee is in training today
+        if (employeeTrainingRepository.existsOverlappingInProgressTraining(employeeUser, today, today)) {
             throw new BusinessRuleException("Cannot assign task to employee currently in training");
         }
 
         // Check if employee has approved leave today (INV-EMP-001)
-        LocalDate today = LocalDate.now();
-        User employeeUser = employee.getUser();
         if (leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 employeeUser, LeaveRequestStatus.APPROVED, today, today)) {
             throw new BusinessRuleException("Cannot assign task to employee currently on approved leave");
         }
 
-        EmployeeTask task = new EmployeeTask(employee.getUser(), title, description, TaskStatus.TODO);
+        EmployeeTask task = new EmployeeTask(employeeUser, title, description, TaskStatus.TODO);
         return employeeTaskRepository.save(task);
     }
 
@@ -272,6 +274,23 @@ public class EmployeeService {
 
         if (request.getStatus() != LeaveRequestStatus.PENDING) {
             throw new BusinessRuleException("Only pending leave requests can be approved");
+        }
+
+        Long employeeId = request.getEmployee().getId();
+        employeeRepository.findByUserIdForUpdate(employeeId)
+            .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + employeeId));
+
+        List<Shift> overlappingShifts = shiftRepository.findOverlappingShiftsForEmployeeId(
+            request.getFromDate().atStartOfDay(),
+            request.getToDate().atTime(23, 59, 59),
+            employeeId
+        );
+        if (!overlappingShifts.isEmpty()) {
+            throw new BusinessRuleException("Cannot approve leave: employee has overlapping shifts");
+        }
+
+        if (hasOverlappingTraining(employeeId, request.getFromDate(), request.getToDate())) {
+            throw new BusinessRuleException("Cannot approve leave: employee has overlapping training");
         }
 
         request.setStatus(LeaveRequestStatus.APPROVED);
@@ -391,7 +410,7 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public boolean hasOverlappingTraining(Long employeeId, LocalDate fromDate, LocalDate toDate) {
         User employee = getEmployeeByUserId(employeeId).getUser();
-        return employeeTrainingRepository.existsOverlappingInProgressTraining(employee, fromDate, toDate);
+        return employeeTrainingRepository.existsOverlappingActiveTraining(employee, fromDate, toDate);
     }
 
     /**
@@ -522,8 +541,9 @@ public class EmployeeService {
      * Update employee training status
      */
     public EmployeeTraining updateEmployeeTrainingStatus(Long employeeId, Long trainingId, TrainingStatus status) {
-        // Validate employee exists
-        Employee employee = getEmployeeByUserId(employeeId);
+        // Validate employee exists with pessimistic lock
+        Employee employee = employeeRepository.findByUserIdForUpdate(employeeId)
+            .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + employeeId));
         
         // Validate training exists
         Training training = trainingRepository.findById(trainingId)
@@ -569,13 +589,14 @@ public class EmployeeService {
             return false;
         }
 
-        // Check if employee is in training
-        if (hasInProgressTraining(employeeId)) {
+        User employeeUser = employee.getUser();
+
+        // Check if employee is in training on this date
+        if (employeeTrainingRepository.existsOverlappingInProgressTraining(employeeUser, date, date)) {
             return false;
         }
 
         // Check if employee has approved leave on this date
-        User employeeUser = employee.getUser();
         return !leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 employeeUser, LeaveRequestStatus.APPROVED, date, date);
     }
@@ -592,13 +613,14 @@ public class EmployeeService {
             return false;
         }
 
-        // Check if employee is in training
-        if (hasInProgressTraining(employeeId)) {
+        User employeeUser = employee.getUser();
+
+        // Check if employee is in training on this date
+        if (employeeTrainingRepository.existsOverlappingInProgressTraining(employeeUser, date, date)) {
             return false;
         }
 
         // Check if employee has approved leave on this date (INV-EMP-001)
-        User employeeUser = employee.getUser();
         return !leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
                 employeeUser, LeaveRequestStatus.APPROVED, date, date);
     }
@@ -625,8 +647,14 @@ public class EmployeeService {
         }
 
         // Validate time range
+        if (startAt == null || endAt == null) {
+            throw new BusinessRuleException("Shift start time and end time are required");
+        }
         if (startAt.isAfter(endAt)) {
             throw new BusinessRuleException("Shift start time cannot be after end time");
+        }
+        if (startAt.isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("Shift start time cannot be in the past");
         }
 
         if (startAt.isBefore(LocalDateTime.now())) {
@@ -665,8 +693,14 @@ public class EmployeeService {
             .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + shift.getEmployee().getId()));
 
         // Validate time range
+        if (startAt == null || endAt == null) {
+            throw new BusinessRuleException("Shift start time and end time are required");
+        }
         if (startAt.isAfter(endAt)) {
             throw new BusinessRuleException("Shift start time cannot be after end time");
+        }
+        if (startAt.isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("Shift start time cannot be in the past");
         }
 
         // Check for overlapping shifts (excluding current shift) using database query

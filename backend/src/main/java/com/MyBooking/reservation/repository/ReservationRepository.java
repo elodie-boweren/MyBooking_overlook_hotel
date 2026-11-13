@@ -179,6 +179,7 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      * @param pageable Pagination information
      * @return Page of reservations with check-in in the date range
      */
+    @EntityGraph(attributePaths = {"client", "room"})
     Page<Reservation> findByCheckInBetween(LocalDate startDate, LocalDate endDate, Pageable pageable);
     
     /**

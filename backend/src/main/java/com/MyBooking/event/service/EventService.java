@@ -520,7 +520,8 @@ public class EventService {
      * Update event from DTO
      */
     public com.MyBooking.event.dto.EventResponseDto updateEventAsDto(Long eventId, com.MyBooking.event.dto.EventUpdateRequestDto request) {
-        Event event = getEventById(eventId);
+        Event event = eventRepository.findByIdForUpdate(eventId)
+            .orElseThrow(() -> new NotFoundException("Event not found with ID: " + eventId));
 
         String name = request.getName() != null ? request.getName() : event.getName();
         String description = request.getDescription() != null ? request.getDescription() : event.getDescription();
@@ -672,7 +673,8 @@ public class EventService {
         booking.setEventDateTime(event.getStartAt());
         booking.setBookingDate(LocalDateTime.now());
         booking.setNumberOfParticipants(numberOfParticipants);
-        booking.setDurationHours((int) ChronoUnit.HOURS.between(event.getStartAt(), event.getEndAt()));
+        long durationMinutes = ChronoUnit.MINUTES.between(event.getStartAt(), event.getEndAt());
+        booking.setDurationHours((int) Math.max(1L, (durationMinutes + 59) / 60));
         booking.setTotalPrice(event.getPrice().multiply(BigDecimal.valueOf(numberOfParticipants)));
         
         EventBooking savedBooking = eventBookingRepository.save(booking);
@@ -719,7 +721,7 @@ public class EventService {
      */
     @Transactional
     public com.MyBooking.event.dto.EventBookingResponseDto cancelEventBookingAsDto(Long bookingId, Long userId, String reason) {
-        EventBooking booking = eventBookingRepository.findById(bookingId)
+        EventBooking booking = eventBookingRepository.findByIdForUpdate(bookingId)
             .orElseThrow(() -> new NotFoundException("Event booking not found with ID: " + bookingId));
         
         // Validate that the booking belongs to the user
@@ -755,7 +757,7 @@ public class EventService {
      * Update event booking status as DTO
      */
     public com.MyBooking.event.dto.EventBookingResponseDto updateEventBookingStatusAsDto(Long bookingId, com.MyBooking.event.domain.EventBookingStatus status) {
-        EventBooking booking = eventBookingRepository.findById(bookingId)
+        EventBooking booking = eventBookingRepository.findByIdForUpdate(bookingId)
             .orElseThrow(() -> new NotFoundException("Event booking not found with ID: " + bookingId));
 
         if (status == EventBookingStatus.CONFIRMED && booking.getStatus() != EventBookingStatus.CONFIRMED) {

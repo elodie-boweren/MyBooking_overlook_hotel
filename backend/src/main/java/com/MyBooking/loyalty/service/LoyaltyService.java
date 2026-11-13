@@ -350,7 +350,7 @@ public class LoyaltyService {
             .orElseGet(() -> {
                 userRepository.findByIdForUpdate(userId)
                     .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
-                return loyaltyAccountRepository.findByUserId(userId)
+                return loyaltyAccountRepository.findByUserIdForUpdate(userId)
                     .orElseGet(() -> createLoyaltyAccount(userId));
             });
     }
@@ -407,6 +407,11 @@ public class LoyaltyService {
 
     // ========== STATISTICS & ANALYTICS ==========
 
+    @Transactional(readOnly = true)
+    public long getTotalLoyaltyAccountsCount() {
+        return loyaltyAccountRepository.count();
+    }
+
     /**
      * Get loyalty program statistics
      */
@@ -461,6 +466,11 @@ public class LoyaltyService {
             throw new BusinessRuleException("Reservation has no associated client");
         }
 
+        if (loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.EARN, reservationId)) {
+            return loyaltyTransactionRepository.findByTypeAndReservationId(LoyaltyTxType.EARN, reservationId)
+                .stream().findFirst().orElse(null);
+        }
+
         return earnPoints(
             reservation.getClient().getId(),
             reservation.getTotalPrice(),
@@ -487,6 +497,10 @@ public class LoyaltyService {
 
         LoyaltyAccount account = loyaltyAccountRepository.findByUserIdForUpdate(reservation.getClient().getId())
             .orElseGet(() -> getOrCreateLoyaltyAccount(reservation.getClient().getId()));
+
+        if (loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.REFUND, reservationId)) {
+            return null; // Idempotent: already refunded for this reservation
+        }
 
         // Create REFUND transaction directly restoring points 1:1
         LoyaltyTransaction transaction = new LoyaltyTransaction(account, LoyaltyTxType.REFUND, pointsUsed, reservation);

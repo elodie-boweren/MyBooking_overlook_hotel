@@ -54,6 +54,9 @@ public class RoomService {
     @Autowired(required = false)
     private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
+    @Autowired(required = false)
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
+
     // ========== ROOM MANAGEMENT ==========
 
     /**
@@ -107,12 +110,32 @@ public class RoomService {
      */
     public Room updateRoom(Long roomId, String number, RoomType roomType, 
                           BigDecimal price, String currency, Integer capacity, String description, RoomStatus status) {
+        if (price == null || price.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessRuleException("Room price must be greater than 0");
+        }
+        if (capacity == null || capacity < 1) {
+            throw new BusinessRuleException("Room capacity must be at least 1");
+        }
         Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
         
         // Check if room number is being changed and if it's unique
         if (!room.getNumber().equals(number) && roomRepository.existsByNumber(number)) {
             throw new BusinessRuleException("Room number already exists: " + number);
+        }
+
+        if (status == RoomStatus.OUT_OF_SERVICE &&
+            reservationRepository.existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(
+                roomId, ReservationStatus.CONFIRMED, LocalDate.now())) {
+            throw new BusinessRuleException("Cannot mark room as out of service while it has active or future confirmed reservations");
+        }
+
+        boolean hasActiveOverCapacityReservation = reservationRepository.findByRoomId(roomId).stream()
+            .anyMatch(r -> r.getStatus() == ReservationStatus.CONFIRMED
+                && r.getCheckOut() != null && !r.getCheckOut().isBefore(LocalDate.now())
+                && r.getNumberOfGuests() != null && r.getNumberOfGuests() > capacity);
+        if (hasActiveOverCapacityReservation) {
+            throw new BusinessRuleException("Cannot reduce room capacity below active reservation guest count");
         }
         
         room.setNumber(number);
@@ -155,6 +178,9 @@ public class RoomService {
      */
     @Transactional(readOnly = true)
     public boolean isRoomAvailable(Long roomId, LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
+            throw new BusinessRuleException("Check-out date must be after check-in date");
+        }
         Room room = getRoomById(roomId);
         
         // Rooms that are out of service cannot be reserved for any dates
@@ -254,6 +280,10 @@ public class RoomService {
     public Room markRoomAsOutOfService(Long roomId, String reason, User updatedBy) {
         Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
+        if (reservationRepository.existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(
+                roomId, ReservationStatus.CONFIRMED, LocalDate.now())) {
+            throw new BusinessRuleException("Cannot mark room as out of service while it has active or future confirmed reservations");
+        }
         RoomStatus oldStatus = room.getStatus();
         
         room.setStatus(RoomStatus.OUT_OF_SERVICE);
@@ -557,6 +587,16 @@ public class RoomService {
         String rawPassword = java.util.UUID.randomUUID().toString();
         newSystemUser.setPassword(passwordEncoder != null ? passwordEncoder.encode(rawPassword) : rawPassword);
         
+        if (transactionManager != null) {
+            org.springframework.transaction.support.TransactionTemplate requiresNewTx =
+                new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+            requiresNewTx.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+            try {
+                return requiresNewTx.execute(status -> userRepository.save(newSystemUser));
+            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+                return userRepository.findByEmail("system@hotel.com").orElseThrow(() -> ex);
+            }
+        }
         try {
             return userRepository.save(newSystemUser);
         } catch (org.springframework.dao.DataIntegrityViolationException ex) {

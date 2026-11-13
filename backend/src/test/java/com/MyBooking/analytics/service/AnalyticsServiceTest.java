@@ -241,9 +241,10 @@ class AnalyticsServiceTest {
         assertThat(trends.get("monthlyRevenue")).asList().hasSize(2);
 
         LocalDate expectedFirstMonthStart = LocalDate.now().withDayOfMonth(1).minusMonths(1);
+        LocalDate expectedLastMonthEnd = LocalDate.now().withDayOfMonth(LocalDate.now().lengthOfMonth());
         org.mockito.Mockito.verify(reservationService).getOverlappingReservationsInDateRange(
             expectedFirstMonthStart,
-            expectedFirstMonthStart.withDayOfMonth(expectedFirstMonthStart.lengthOfMonth()),
+            expectedLastMonthEnd,
             ReservationStatus.CONFIRMED
         );
     }

@@ -64,6 +64,14 @@ public class InstallationService {
             throw new BusinessRuleException("Installation with name '" + name + "' already exists.");
         }
 
+        // Prevent shrinking capacity below existing upcoming events on this installation
+        boolean hasLargerUpcomingEvent = eventRepository.findByInstallationId(installationId).stream()
+            .anyMatch(e -> e.getEndAt() != null && e.getEndAt().isAfter(LocalDateTime.now())
+                && e.getCapacity() != null && e.getCapacity() > capacity);
+        if (hasLargerUpcomingEvent) {
+            throw new BusinessRuleException("Cannot reduce installation capacity below existing upcoming event capacity");
+        }
+
         installation.setName(name);
         installation.setDescription(description);
         installation.setInstallationType(installationType);
@@ -129,6 +137,9 @@ public class InstallationService {
 
     @Transactional(readOnly = true)
     public boolean isInstallationAvailable(Long installationId, LocalDateTime startDateTime, LocalDateTime endDateTime) {
+        if (startDateTime == null || endDateTime == null || !endDateTime.isAfter(startDateTime)) {
+            throw new BusinessRuleException("Event end time must be after start time");
+        }
         getInstallationById(installationId);
         return !eventRepository.existsOverlappingEventForInstallation(installationId, startDateTime, endDateTime);
     }
@@ -142,6 +153,9 @@ public class InstallationService {
     @Transactional(readOnly = true)
     public List<Installation> findAvailableInstallations(LocalDateTime startDateTime, LocalDateTime endDateTime, 
                                                         Integer participants, InstallationType installationType) {
+        if (startDateTime == null || endDateTime == null || !endDateTime.isAfter(startDateTime)) {
+            throw new BusinessRuleException("Event end time must be after start time");
+        }
         return installationRepository.findAvailableInstallations(startDateTime, endDateTime, participants, installationType);
     }
 

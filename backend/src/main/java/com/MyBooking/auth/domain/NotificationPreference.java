@@ -7,7 +7,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "notification_preference")
+@Table(name = "notification_preference", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "notification_type"}))
 public class NotificationPreference {
     
     @Id

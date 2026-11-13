@@ -76,7 +76,12 @@ public class AuthService {
         user.setRole(role);
         
         
-        User savedUser = userRepository.save(user);
+        User savedUser;
+        try {
+            savedUser = userRepository.save(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw new BusinessRuleException("Email already exists: " + normalizedEmail);
+        }
         
         // Create default notification preferences
         createDefaultNotificationPreferences(savedUser);
@@ -169,6 +174,9 @@ public class AuthService {
      */
     public NotificationPreference updateNotificationPreference(String email, String notificationType, 
                                                               Boolean emailEnabled, Boolean smsEnabled, Boolean pushEnabled) {
+        if (emailEnabled == null || smsEnabled == null || pushEnabled == null) {
+            throw new BusinessRuleException("Notification preference flags cannot be null");
+        }
         User user = getUserProfile(email);
         User lockedUser = userRepository.findByIdForUpdate(user.getId())
             .orElseThrow(() -> new NotFoundException("User not found with ID: " + user.getId()));
@@ -249,7 +257,12 @@ public class AuthService {
         user.setBirthDate(birthDate);
         user.setRole(role);
         
-        User savedUser = userRepository.save(user);
+        User savedUser;
+        try {
+            savedUser = userRepository.save(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw new BusinessRuleException("Email already exists: " + normalizedEmail);
+        }
         
         // Create default notification preferences
         createDefaultNotificationPreferences(savedUser);
@@ -283,7 +296,12 @@ public class AuthService {
         user.setBirthDate(birthDate);
         user.setRole(role);
         
-        User savedUser = userRepository.save(user);
+        User savedUser;
+        try {
+            savedUser = userRepository.save(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            throw new BusinessRuleException("Email already exists: " + normalizedEmail);
+        }
         if (role == Role.EMPLOYEE) {
             createEmployeeRecord(savedUser);
         }

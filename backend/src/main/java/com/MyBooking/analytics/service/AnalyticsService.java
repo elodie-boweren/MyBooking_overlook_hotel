@@ -56,8 +56,15 @@ public class AnalyticsService {
 
     // ==================== REVENUE ANALYTICS ====================
 
+    private void validateDateRange(LocalDate startDate, LocalDate endDate) {
+        if (startDate == null || endDate == null || endDate.isBefore(startDate)) {
+            throw new com.MyBooking.common.exception.BusinessRuleException("End date must not be before start date");
+        }
+    }
+
     @Transactional(readOnly = true)
     public Map<String, Object> getRevenueAnalytics(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
         List<Reservation> overlappingReservations = reservationService.getOverlappingReservationsInDateRange(
             startDate, endDate, ReservationStatus.CONFIRMED);
         return buildRevenueAnalytics(startDate, endDate, overlappingReservations,
@@ -127,6 +134,9 @@ public class AnalyticsService {
 
         LocalDate endDate = LocalDate.now();
         LocalDate firstMonthStart = endDate.withDayOfMonth(1).minusMonths(months - 1L);
+        LocalDate lastMonthEnd = endDate.withDayOfMonth(endDate.lengthOfMonth());
+        List<Reservation> allPeriodReservations = reservationService.getOverlappingReservationsInDateRange(
+            firstMonthStart, lastMonthEnd, ReservationStatus.CONFIRMED);
         
         for (int i = 0; i < months; i++) {
             LocalDate monthStart = firstMonthStart.plusMonths(i);
@@ -136,7 +146,7 @@ public class AnalyticsService {
             monthData.put("month", monthStart.getMonth().name());
             monthData.put("year", monthStart.getYear());
             
-            BigDecimal monthRevenue = calculateRoomRevenue(monthStart, monthEnd)
+            BigDecimal monthRevenue = calculateRoomRevenue(allPeriodReservations, monthStart, monthEnd)
                 .add(calculateEventRevenue(monthStart, monthEnd));
             monthData.put("revenue", monthRevenue);
             
@@ -155,6 +165,7 @@ public class AnalyticsService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getOccupancyMetrics(LocalDate startDate, LocalDate endDate) {
+        validateDateRange(startDate, endDate);
         long totalRooms = roomService.getRoomStatistics().getTotalRooms();
         List<Reservation> overlappingReservations = reservationService.getOverlappingReservationsInDateRange(
             startDate, endDate, ReservationStatus.CONFIRMED);
@@ -413,8 +424,8 @@ public class AnalyticsService {
     }
 
     private long getActiveLoyaltyUsersCount() {
-        // Get count of loyalty accounts (users who have earned/redeemed points)
-        return loyaltyService.getLoyaltyStatistics().getTotalAccounts();
+        // Get count of loyalty accounts without running full loyalty statistics
+        return loyaltyService.getTotalLoyaltyAccountsCount();
     }
 
     private long calculateOccupiedRoomNights(LocalDate startDate, LocalDate endDate) {
@@ -447,7 +458,7 @@ public class AnalyticsService {
         long totalFeedbacks = stats != null ? stats.getTotalFeedbacks() : 0L;
         analytics.put("totalFeedbacks", totalFeedbacks);
 
-        Double avgRating = feedbackService.getOverallAverageRating();
+        Double avgRating = stats != null ? stats.getOverallAverageRating() : null;
         analytics.put("averageRating", avgRating != null ? avgRating : 0.0);
 
         Map<String, Long> ratingDistribution = new HashMap<>();

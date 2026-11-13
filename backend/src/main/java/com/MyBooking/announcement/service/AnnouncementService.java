@@ -390,7 +390,8 @@ public class AnnouncementService {
     public AnnouncementReplyResponseDto addReplyAsDto(Long announcementId, Long userId, AnnouncementReplyRequestDto request) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
-        Announcement announcement = getAnnouncementById(announcementId);
+        Announcement announcement = announcementRepository.findByIdForUpdate(announcementId)
+            .orElseThrow(() -> new NotFoundException("Announcement not found with ID: " + announcementId));
         assertUserCanAccessAnnouncement(user, announcement);
 
         AnnouncementReply reply = addReply(announcementId, userId, request.getMessage());

@@ -721,4 +721,19 @@ class LoyaltyServiceTest {
         verify(loyaltyTransactionRepository).getTotalPointsByType(LoyaltyTxType.EARN);
         verify(loyaltyTransactionRepository).getTotalPointsByType(LoyaltyTxType.REDEEM);
     }
+
+    @Test
+    void refundReservationPoints_WhenAlreadyRefunded_ShouldBeIdempotent() {
+        testAccount.setBalance(1000);
+        when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(loyaltyAccountRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testAccount));
+        when(loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.REFUND, 1L)).thenReturn(true);
+
+        LoyaltyTransaction result = loyaltyService.refundReservationPoints(1L, 500);
+
+        assertThat(result).isNull();
+        assertThat(testAccount.getBalance()).isEqualTo(1000);
+        verify(loyaltyTransactionRepository, never()).save(any());
+        verify(loyaltyAccountRepository, never()).save(any());
+    }
 }

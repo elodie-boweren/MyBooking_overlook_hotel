@@ -20,7 +20,7 @@ public class Installation {
     
     @NotBlank(message = "Installation name is required")
     @Size(max = 100, message = "Installation name must not exceed 100 characters")
-    @Column(name = "name", nullable = false, length = 100)
+    @Column(name = "name", nullable = false, unique = true, length = 100)
     private String name;
     
     @Size(max = 500, message = "Description must not exceed 500 characters")

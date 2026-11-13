@@ -193,6 +193,9 @@ public class ReservationService {
     public BigDecimal calculateFinalPriceWithPoints(Long roomId, LocalDate checkIn, 
                                                   LocalDate checkOut, Integer numberOfGuests, 
                                                   Long clientId, Integer pointsToRedeem) {
+        if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
+            throw new BusinessRuleException("Check-out date must be after check-in date");
+        }
         // Get room
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + roomId));
@@ -219,6 +222,9 @@ public class ReservationService {
     @Transactional(readOnly = true)
     public Integer getMaxRedeemablePoints(Long roomId, LocalDate checkIn, LocalDate checkOut, 
                                         Integer numberOfGuests, Long clientId) {
+        if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
+            throw new BusinessRuleException("Check-out date must be after check-in date");
+        }
         // Get room
         Room room = roomRepository.findById(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with ID: " + roomId));
@@ -671,7 +677,8 @@ public class ReservationService {
      * Update reservation from DTO (Client controller)
      */
     public ReservationResponseDto updateReservation(Long id, ReservationUpdateRequestDto request, Long clientId) {
-        Reservation reservation = getReservationById(id);
+        Reservation reservation = reservationRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + id));
         if (!reservation.getClient().getId().equals(clientId)) {
             throw new BusinessRuleException("You can only update your own reservations");
         }
@@ -690,12 +697,14 @@ public class ReservationService {
      * Update reservation from DTO (Admin controller)
      */
     public ReservationResponseDto updateReservation(Long id, ReservationUpdateRequestDto request) {
+        Reservation reservation = reservationRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + id));
         Reservation updatedReservation = updateReservation(
             id, 
             request.getCheckIn(), 
             request.getCheckOut(), 
             request.getNumberOfGuests(), 
-            getReservationById(id).getCurrency()
+            reservation.getCurrency()
         );
         return convertToResponseDto(updatedReservation);
     }
@@ -705,7 +714,8 @@ public class ReservationService {
      */
     @Transactional
     public void cancelReservation(Long id, Long clientId) {
-        Reservation reservation = getReservationById(id);
+        Reservation reservation = reservationRepository.findByIdForUpdate(id)
+            .orElseThrow(() -> new NotFoundException("Reservation not found with ID: " + id));
         if (!reservation.getClient().getId().equals(clientId)) {
             throw new BusinessRuleException("You can only cancel your own reservations");
         }

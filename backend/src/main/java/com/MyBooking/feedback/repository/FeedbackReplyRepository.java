@@ -36,6 +36,7 @@ public interface FeedbackReplyRepository extends JpaRepository<FeedbackReply, Lo
     
     // Find by admin user (entity-based)
     List<FeedbackReply> findByAdminUser(User adminUser);
+    @EntityGraph(attributePaths = {"adminUser", "feedback"})
     Page<FeedbackReply> findByAdminUser(User adminUser, Pageable pageable);
     
     // Find by admin user (ID-based)

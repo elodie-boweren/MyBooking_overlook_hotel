@@ -659,19 +659,7 @@ public class EmployeeService {
         }
 
         // Validate time range
-        if (startAt == null || endAt == null) {
-            throw new BusinessRuleException("Shift start time and end time are required");
-        }
-        if (startAt.isAfter(endAt)) {
-            throw new BusinessRuleException("Shift start time cannot be after end time");
-        }
-        if (startAt.isBefore(LocalDateTime.now())) {
-            throw new BusinessRuleException("Shift start time cannot be in the past");
-        }
-
-        if (startAt.isBefore(LocalDateTime.now())) {
-            throw new BusinessRuleException("Shift start time cannot be in the past");
-        }
+        validateShiftTimeRange(startAt, endAt);
 
         // Check for overlapping shifts
         List<Shift> overlappingShifts = shiftRepository.findOverlappingShiftsForEmployeeId(startAt, endAt, employeeId);
@@ -698,15 +686,7 @@ public class EmployeeService {
             .orElseThrow(() -> new NotFoundException("Employee not found with user ID: " + shift.getEmployee().getId()));
 
         // Validate time range
-        if (startAt == null || endAt == null) {
-            throw new BusinessRuleException("Shift start time and end time are required");
-        }
-        if (startAt.isAfter(endAt)) {
-            throw new BusinessRuleException("Shift start time cannot be after end time");
-        }
-        if (startAt.isBefore(LocalDateTime.now())) {
-            throw new BusinessRuleException("Shift start time cannot be in the past");
-        }
+        validateShiftTimeRange(startAt, endAt);
 
         // Check for overlapping shifts (excluding current shift) using database query
         List<Shift> overlappingShifts = shiftRepository.findOverlappingShiftsForEmployeeIdExcludingShiftId(
@@ -721,6 +701,18 @@ public class EmployeeService {
         shift.setStartAt(startAt);
         shift.setEndAt(endAt);
         return shiftRepository.save(shift);
+    }
+
+    private void validateShiftTimeRange(LocalDateTime startAt, LocalDateTime endAt) {
+        if (startAt == null || endAt == null) {
+            throw new BusinessRuleException("Shift start time and end time are required");
+        }
+        if (!endAt.isAfter(startAt)) {
+            throw new BusinessRuleException("Shift end time must be after start time");
+        }
+        if (startAt.isBefore(LocalDateTime.now())) {
+            throw new BusinessRuleException("Shift start time cannot be in the past");
+        }
     }
 
     private void ensureEmployeeAvailableForShiftRange(Employee employee, LocalDate startDate, LocalDate endDate) {

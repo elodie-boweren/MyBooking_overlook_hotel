@@ -449,6 +449,14 @@ public class ReservationService {
      */
     @Transactional(readOnly = true)
     public boolean isRoomAvailable(Long roomId, LocalDate checkIn, LocalDate checkOut) {
+        if (checkIn == null || checkOut == null || !checkOut.isAfter(checkIn)) {
+            throw new BusinessRuleException("Check-out date must be after check-in date");
+        }
+        Room room = roomRepository.findById(roomId)
+            .orElseThrow(() -> new NotFoundException("Room not found with ID: " + roomId));
+        if (room.getStatus() == RoomStatus.OUT_OF_SERVICE) {
+            return false;
+        }
         return reservationRepository.countConflictingReservations(roomId, checkIn, checkOut) == 0;
     }
 

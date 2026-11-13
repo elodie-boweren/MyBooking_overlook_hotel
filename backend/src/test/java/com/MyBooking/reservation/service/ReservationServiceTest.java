@@ -418,6 +418,7 @@ class ReservationServiceTest {
     @Test
     void isRoomAvailable_WithAvailableRoom_ShouldReturnTrue() {
         // Given
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
         when(reservationRepository.countConflictingReservations(1L, testCheckIn, testCheckOut))
             .thenReturn(0L);
         
@@ -432,6 +433,7 @@ class ReservationServiceTest {
     @Test
     void isRoomAvailable_WithConflictingReservation_ShouldReturnFalse() {
         // Given
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
         when(reservationRepository.countConflictingReservations(1L, testCheckIn, testCheckOut))
             .thenReturn(1L);
         
@@ -441,6 +443,17 @@ class ReservationServiceTest {
         // Then
         assertThat(result).isFalse();
         verify(reservationRepository).countConflictingReservations(1L, testCheckIn, testCheckOut);
+    }
+
+    @Test
+    void isRoomAvailable_WithOutOfServiceRoom_ShouldReturnFalse() {
+        testRoom.setStatus(RoomStatus.OUT_OF_SERVICE);
+        when(roomRepository.findById(1L)).thenReturn(Optional.of(testRoom));
+
+        boolean result = reservationService.isRoomAvailable(1L, testCheckIn, testCheckOut);
+
+        assertThat(result).isFalse();
+        verify(reservationRepository, never()).countConflictingReservations(any(), any(), any());
     }
 
     @Test

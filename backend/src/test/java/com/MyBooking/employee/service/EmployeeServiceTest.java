@@ -806,4 +806,14 @@ class EmployeeServiceTest {
         assertThat(created).isNotNull();
         assertThat(created.getStatus()).isEqualTo(LeaveRequestStatus.PENDING);
     }
+
+    @Test
+    void createShift_WithZeroDuration_ShouldThrowBusinessRuleException() {
+        LocalDateTime sameTime = LocalDateTime.now().plusDays(2).withHour(9).withMinute(0);
+        when(employeeRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testEmployee));
+
+        assertThatThrownBy(() -> employeeService.createShift(1L, sameTime, sameTime))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Shift end time must be after start time");
+    }
 }

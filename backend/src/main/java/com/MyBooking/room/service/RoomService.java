@@ -98,7 +98,8 @@ public class RoomService {
      */
     public Room updateRoom(Long roomId, String number, RoomType roomType, 
                           BigDecimal price, String currency, Integer capacity, String description, RoomStatus status) {
-        Room room = getRoomById(roomId);
+        Room room = roomRepository.findByIdForUpdate(roomId)
+            .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
         
         // Check if room number is being changed and if it's unique
         if (!room.getNumber().equals(number) && roomRepository.existsByNumber(number)) {
@@ -120,7 +121,12 @@ public class RoomService {
      * Delete room (soft delete by setting status to OUT_OF_SERVICE)
      */
     public void deleteRoom(Long roomId) {
-        Room room = getRoomById(roomId);
+        Room room = roomRepository.findByIdForUpdate(roomId)
+            .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
+        if (reservationRepository.existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(
+                roomId, ReservationStatus.CONFIRMED, LocalDate.now())) {
+            throw new BusinessRuleException("Cannot take room out of service while active or upcoming confirmed reservations exist.");
+        }
         room.setStatus(RoomStatus.OUT_OF_SERVICE);
         roomRepository.save(room);
     }
@@ -192,7 +198,7 @@ public class RoomService {
      */
     @Transactional
     public Room updateRoomStatus(Long roomId, RoomStatus newStatus, User updatedBy) {
-        Room room = roomRepository.findById(roomId)
+        Room room = roomRepository.findByIdForUpdate(roomId)
             .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
         
         RoomStatus oldStatus = room.getStatus();
@@ -209,7 +215,8 @@ public class RoomService {
      * Update room status with notes and reason
      */
     public Room updateRoomStatus(Long roomId, RoomStatus newStatus, User updatedBy, String notes, String updateReason) {
-        Room room = getRoomById(roomId);
+        Room room = roomRepository.findByIdForUpdate(roomId)
+            .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
         RoomStatus oldStatus = room.getStatus();
         
         room.setStatus(newStatus);
@@ -239,7 +246,8 @@ public class RoomService {
      * Mark room as out of service
      */
     public Room markRoomAsOutOfService(Long roomId, String reason, User updatedBy) {
-        Room room = getRoomById(roomId);
+        Room room = roomRepository.findByIdForUpdate(roomId)
+            .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
         RoomStatus oldStatus = room.getStatus();
         
         room.setStatus(RoomStatus.OUT_OF_SERVICE);
@@ -258,7 +266,8 @@ public class RoomService {
      * Used for reservation lifecycle events, check-in/check-out, etc.
      */
     public Room updateRoomStatusAutomatically(Long roomId, RoomStatus newStatus, String reason) {
-        Room room = getRoomById(roomId);
+        Room room = roomRepository.findByIdForUpdate(roomId)
+            .orElseThrow(() -> new NotFoundException("Room not found with id: " + roomId));
         RoomStatus oldStatus = room.getStatus();
         
         room.setStatus(newStatus);

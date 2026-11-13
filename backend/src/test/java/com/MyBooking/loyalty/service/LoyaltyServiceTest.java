@@ -659,6 +659,7 @@ class LoyaltyServiceTest {
     void clawbackReservationPoints_WithoutEarnedPoints_ShouldReturnNull() {
         // Given
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(loyaltyAccountRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testAccount));
         when(loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.CLAWBACK, 1L)).thenReturn(false);
         when(loyaltyTransactionRepository.findByTypeAndReservationId(LoyaltyTxType.EARN, 1L))
                 .thenReturn(Collections.emptyList());
@@ -668,6 +669,7 @@ class LoyaltyServiceTest {
 
         // Then
         assertThat(result).isNull();
+        verify(loyaltyAccountRepository).findByUserIdForUpdate(1L);
         verify(loyaltyTransactionRepository, never()).save(any());
         verify(loyaltyAccountRepository, never()).save(any());
     }
@@ -676,6 +678,7 @@ class LoyaltyServiceTest {
     void clawbackReservationPoints_AlreadyClawedBack_ShouldReturnNull() {
         // Given
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
+        when(loyaltyAccountRepository.findByUserIdForUpdate(1L)).thenReturn(Optional.of(testAccount));
         when(loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.CLAWBACK, 1L)).thenReturn(true);
 
         // When
@@ -683,6 +686,7 @@ class LoyaltyServiceTest {
 
         // Then
         assertThat(result).isNull();
+        verify(loyaltyAccountRepository).findByUserIdForUpdate(1L);
         verify(loyaltyTransactionRepository, never()).findByTypeAndReservationId(any(), any());
         verify(loyaltyTransactionRepository, never()).save(any());
     }

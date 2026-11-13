@@ -130,7 +130,8 @@ public class EventService {
      * Delete an event with business rules
      */
     public void deleteEvent(Long eventId, String reason) {
-        Event event = getEventById(eventId);
+        Event event = eventRepository.findByIdForUpdate(eventId)
+            .orElseThrow(() -> new NotFoundException("Event not found with ID: " + eventId));
         
         // Check if event is in the past
         LocalDateTime now = LocalDateTime.now();
@@ -144,19 +145,13 @@ public class EventService {
             throw new BusinessRuleException("Cannot delete events that start within 24 hours");
         }
         
-        // Check if event has existing bookings
-        List<EventBooking> existingBookings = eventBookingRepository.findByEventId(eventId);
-        if (!existingBookings.isEmpty()) {
-            long confirmedBookings = existingBookings.stream()
-                .filter(booking -> booking.getStatus() == EventBookingStatus.CONFIRMED)
-                .count();
-            
-            if (confirmedBookings > 0) {
-                throw new BusinessRuleException(
-                    "Cannot delete event with " + confirmedBookings + " confirmed booking(s). " +
-                    "Please cancel all bookings first or contact support for assistance."
-                );
-            }
+        // Check if event has existing confirmed bookings via DB count under event lock
+        long confirmedBookings = eventBookingRepository.countByEventIdAndStatus(eventId, EventBookingStatus.CONFIRMED);
+        if (confirmedBookings > 0) {
+            throw new BusinessRuleException(
+                "Cannot delete event with " + confirmedBookings + " confirmed booking(s). " +
+                "Please cancel all bookings first or contact support for assistance."
+            );
         }
         
         eventRepository.delete(event);
@@ -513,32 +508,30 @@ public class EventService {
      */
     public com.MyBooking.event.dto.EventResponseDto updateEventAsDto(Long eventId, com.MyBooking.event.dto.EventUpdateRequestDto request) {
         Event event = getEventById(eventId);
-        
-        if (request.getName() != null) event.setName(request.getName());
-        if (request.getDescription() != null) event.setDescription(request.getDescription());
-        if (request.getEventType() != null) event.setEventType(request.getEventType());
-        if (request.getStartAt() != null) event.setStartAt(request.getStartAt());
-        if (request.getEndAt() != null) event.setEndAt(request.getEndAt());
-        if (request.getCapacity() != null) event.setCapacity(request.getCapacity());
-        if (request.getPrice() != null) event.setPrice(request.getPrice());
-        if (request.getCurrency() != null) event.setCurrency(request.getCurrency());
-        if (request.getInstallationId() != null) {
-            Installation installation = installationRepository.findById(request.getInstallationId())
-                .orElseThrow(() -> new NotFoundException("Installation not found with ID: " + request.getInstallationId()));
-            event.setInstallation(installation);
-        }
-        
+
+        String name = request.getName() != null ? request.getName() : event.getName();
+        String description = request.getDescription() != null ? request.getDescription() : event.getDescription();
+        EventType eventType = request.getEventType() != null ? request.getEventType() : event.getEventType();
+        LocalDateTime startAt = request.getStartAt() != null ? request.getStartAt() : event.getStartAt();
+        LocalDateTime endAt = request.getEndAt() != null ? request.getEndAt() : event.getEndAt();
+        Integer capacity = request.getCapacity() != null ? request.getCapacity() : event.getCapacity();
+        BigDecimal price = request.getPrice() != null ? request.getPrice() : event.getPrice();
+        String currency = request.getCurrency() != null ? request.getCurrency() : event.getCurrency();
+        Long installationId = request.getInstallationId() != null
+            ? request.getInstallationId()
+            : event.getInstallation().getId();
+
         Event updatedEvent = updateEvent(
-            event.getId(),
-            event.getName(),
-            event.getDescription(),
-            event.getEventType(),
-            event.getStartAt(),
-            event.getEndAt(),
-            event.getCapacity(),
-            event.getPrice(),
-            event.getCurrency(),
-            event.getInstallation().getId()
+            eventId,
+            name,
+            description,
+            eventType,
+            startAt,
+            endAt,
+            capacity,
+            price,
+            currency,
+            installationId
         );
         return convertToResponseDto(updatedEvent);
     }

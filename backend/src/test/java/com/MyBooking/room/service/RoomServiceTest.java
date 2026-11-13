@@ -167,7 +167,7 @@ class RoomServiceTest {
         // Given
         Long roomId = 1L;
         String newNumber = "102";
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
         when(roomRepository.existsByNumber(newNumber)).thenReturn(false);
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
         
@@ -177,7 +177,7 @@ class RoomServiceTest {
         
         // Then
         assertThat(result).isNotNull();
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomRepository).existsByNumber(newNumber);
         verify(roomRepository).save(testRoom);
     }
@@ -186,15 +186,31 @@ class RoomServiceTest {
     void deleteRoom_ShouldSetStatusToOutOfService() {
         // Given
         Long roomId = 1L;
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
+        when(reservationRepository.existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(
+                eq(roomId), eq(ReservationStatus.CONFIRMED), any(LocalDate.class))).thenReturn(false);
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
         
         // When
         roomService.deleteRoom(roomId);
         
         // Then
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomRepository).save(testRoom);
+    }
+
+    @Test
+    void deleteRoom_WithActiveConfirmedReservations_ShouldThrowBusinessRuleException() {
+        Long roomId = 1L;
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
+        when(reservationRepository.existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(
+                eq(roomId), eq(ReservationStatus.CONFIRMED), any(LocalDate.class))).thenReturn(true);
+
+        assertThatThrownBy(() -> roomService.deleteRoom(roomId))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("active or upcoming confirmed reservations");
+
+        verify(roomRepository, never()).save(any());
     }
 
     // ========== ROOM AVAILABILITY TESTS ==========
@@ -288,7 +304,7 @@ class RoomServiceTest {
         Long roomId = 1L;
         RoomStatus newStatus = RoomStatus.OCCUPIED;
         
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
         when(roomStatusUpdateRepository.save(any(RoomStatusUpdate.class))).thenReturn(new RoomStatusUpdate());
         
@@ -297,7 +313,7 @@ class RoomServiceTest {
         
         // Then
         assertThat(result).isNotNull();
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomRepository).save(testRoom);
         verify(roomStatusUpdateRepository).save(any(RoomStatusUpdate.class));
     }
@@ -306,7 +322,7 @@ class RoomServiceTest {
     void markRoomAsAvailable_ShouldSetStatusToAvailable() {
         // Given
         Long roomId = 1L;
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
         when(roomStatusUpdateRepository.save(any(RoomStatusUpdate.class))).thenReturn(new RoomStatusUpdate());
         
@@ -315,7 +331,7 @@ class RoomServiceTest {
         
         // Then
         assertThat(result).isNotNull();
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomRepository).save(testRoom);
         verify(roomStatusUpdateRepository).save(any(RoomStatusUpdate.class));
     }
@@ -326,7 +342,7 @@ class RoomServiceTest {
         Long roomId = 1L;
         String reason = "Maintenance required";
         
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
         when(roomStatusUpdateRepository.save(any(RoomStatusUpdate.class))).thenReturn(new RoomStatusUpdate());
         
@@ -335,7 +351,7 @@ class RoomServiceTest {
         
         // Then
         assertThat(result).isNotNull();
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomRepository).save(testRoom);
         verify(roomStatusUpdateRepository).save(any(RoomStatusUpdate.class));
     }
@@ -354,7 +370,7 @@ class RoomServiceTest {
         systemUser.setEmail("system@hotel.com");
         systemUser.setRole(Role.ADMIN);
         
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
         when(userRepository.findByEmail("system@hotel.com")).thenReturn(Optional.of(systemUser));
         when(roomStatusUpdateRepository.save(any(RoomStatusUpdate.class))).thenReturn(new RoomStatusUpdate());
@@ -364,7 +380,7 @@ class RoomServiceTest {
         
         // Then
         assertThat(result).isNotNull();
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomRepository).save(testRoom);
         verify(userRepository).findByEmail("system@hotel.com");
         verify(roomStatusUpdateRepository).save(any(RoomStatusUpdate.class));
@@ -376,7 +392,7 @@ class RoomServiceTest {
         Long roomId = 1L;
         String reason = "Guest checked in - Reservation ID: 123";
         
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
         when(roomStatusUpdateRepository.save(any(RoomStatusUpdate.class))).thenReturn(new RoomStatusUpdate());
         
@@ -385,7 +401,7 @@ class RoomServiceTest {
         
         // Then
         assertThat(result).isNotNull();
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomRepository).save(testRoom);
         verify(roomStatusUpdateRepository).save(any(RoomStatusUpdate.class));
     }
@@ -396,7 +412,7 @@ class RoomServiceTest {
         Long roomId = 1L;
         String reason = "Guest checked out - Reservation ID: 123";
         
-        when(roomRepository.findById(roomId)).thenReturn(Optional.of(testRoom));
+        when(roomRepository.findByIdForUpdate(roomId)).thenReturn(Optional.of(testRoom));
         when(roomRepository.save(any(Room.class))).thenReturn(testRoom);
         when(roomStatusUpdateRepository.save(any(RoomStatusUpdate.class))).thenReturn(new RoomStatusUpdate());
         
@@ -405,7 +421,7 @@ class RoomServiceTest {
         
         // Then
         assertThat(result).isNotNull();
-        verify(roomRepository).findById(roomId);
+        verify(roomRepository).findByIdForUpdate(roomId);
         verify(roomRepository).save(testRoom);
         verify(roomStatusUpdateRepository).save(any(RoomStatusUpdate.class));
     }

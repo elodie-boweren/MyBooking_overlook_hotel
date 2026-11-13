@@ -505,7 +505,12 @@ public class LoyaltyService {
             throw new BusinessRuleException("Reservation has no associated client");
         }
 
-        // Check if clawback has already been executed (idempotency guard)
+        // Acquire pessimistic write lock on the user's loyalty account BEFORE idempotency check
+        // to serialize concurrent clawbacks and prevent double-deduction (TOCTOU).
+        LoyaltyAccount account = loyaltyAccountRepository.findByUserIdForUpdate(reservation.getClient().getId())
+            .orElseGet(() -> getOrCreateLoyaltyAccount(reservation.getClient().getId()));
+
+        // Check if clawback has already been executed (idempotency guard under lock)
         if (loyaltyTransactionRepository.existsByTypeAndReservationId(LoyaltyTxType.CLAWBACK, reservationId)) {
             return null;
         }
@@ -521,9 +526,6 @@ public class LoyaltyService {
         if (totalEarnedPoints <= 0) {
             return null; // No earned points to claw back
         }
-
-        LoyaltyAccount account = loyaltyAccountRepository.findByUserIdForUpdate(reservation.getClient().getId())
-            .orElseGet(() -> getOrCreateLoyaltyAccount(reservation.getClient().getId()));
 
         // Create CLAWBACK transaction
         LoyaltyTransaction transaction = new LoyaltyTransaction(account, LoyaltyTxType.CLAWBACK, totalEarnedPoints, reservation);

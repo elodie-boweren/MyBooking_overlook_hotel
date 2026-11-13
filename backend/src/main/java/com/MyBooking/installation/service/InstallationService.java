@@ -54,7 +54,8 @@ public class InstallationService {
     public Installation updateInstallation(Long installationId, String name, String description, 
                                          InstallationType installationType, Integer capacity, 
                                          BigDecimal hourlyRate, String currency, String equipment) {
-        Installation installation = getInstallationById(installationId);
+        Installation installation = installationRepository.findByIdForUpdate(installationId)
+                .orElseThrow(() -> new NotFoundException("Installation not found with ID: " + installationId));
         validateInstallationData(name, installationType, capacity, hourlyRate, currency);
         
         // Check for name conflicts (excluding current installation)
@@ -76,11 +77,11 @@ public class InstallationService {
 
     @Transactional
     public void deleteInstallation(Long installationId) {
-        Installation installation = getInstallationById(installationId);
+        Installation installation = installationRepository.findByIdForUpdate(installationId)
+                .orElseThrow(() -> new NotFoundException("Installation not found with ID: " + installationId));
         
-        // Check if installation has any events
-        List<Event> events = eventRepository.findByInstallation(installation);
-        if (!events.isEmpty()) {
+        // Check if installation has any events (serialized via pessimistic lock on Installation)
+        if (eventRepository.existsByInstallationId(installationId)) {
             throw new BusinessRuleException("Cannot delete installation with existing events. Delete events first.");
         }
         

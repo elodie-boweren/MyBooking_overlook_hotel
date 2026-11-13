@@ -125,7 +125,7 @@ class InstallationServiceTest {
         String newCurrency = "EUR";
         String newEquipment = "Updated equipment";
 
-        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
+        when(installationRepository.findByIdForUpdate(installationId)).thenReturn(Optional.of(testInstallation));
         when(installationRepository.existsByNameIgnoreCase(newName)).thenReturn(false);
         when(installationRepository.save(any(Installation.class))).thenReturn(testInstallation);
 
@@ -134,7 +134,7 @@ class InstallationServiceTest {
 
         // Then
         assertThat(result).isNotNull();
-        verify(installationRepository).findByIdWithoutEvents(installationId);
+        verify(installationRepository).findByIdForUpdate(installationId);
         verify(installationRepository).existsByNameIgnoreCase(newName);
         verify(installationRepository).save(any(Installation.class));
     }
@@ -143,7 +143,7 @@ class InstallationServiceTest {
     void updateInstallation_WithNonExistentId_ShouldThrowNotFoundException() {
         // Given
         Long installationId = 999L;
-        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.empty());
+        when(installationRepository.findByIdForUpdate(installationId)).thenReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> installationService.updateInstallation(installationId, "Name", "Description", InstallationType.CONFERENCE_ROOM, 50, new BigDecimal("100.00"), "USD", "Equipment"))
@@ -155,15 +155,15 @@ class InstallationServiceTest {
     void deleteInstallation_WithNoEvents_ShouldDeleteInstallation() {
         // Given
         Long installationId = 1L;
-        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
-        when(eventRepository.findByInstallation(testInstallation)).thenReturn(Collections.emptyList());
+        when(installationRepository.findByIdForUpdate(installationId)).thenReturn(Optional.of(testInstallation));
+        when(eventRepository.existsByInstallationId(installationId)).thenReturn(false);
 
         // When
         installationService.deleteInstallation(installationId);
 
         // Then
-        verify(installationRepository).findByIdWithoutEvents(installationId);
-        verify(eventRepository).findByInstallation(testInstallation);
+        verify(installationRepository).findByIdForUpdate(installationId);
+        verify(eventRepository).existsByInstallationId(installationId);
         verify(installationRepository).delete(testInstallation);
     }
 
@@ -171,8 +171,8 @@ class InstallationServiceTest {
     void deleteInstallation_WithExistingEvents_ShouldThrowBusinessRuleException() {
         // Given
         Long installationId = 1L;
-        when(installationRepository.findByIdWithoutEvents(installationId)).thenReturn(Optional.of(testInstallation));
-        when(eventRepository.findByInstallation(testInstallation)).thenReturn(Arrays.asList(testEvent));
+        when(installationRepository.findByIdForUpdate(installationId)).thenReturn(Optional.of(testInstallation));
+        when(eventRepository.existsByInstallationId(installationId)).thenReturn(true);
 
         // When & Then
         assertThatThrownBy(() -> installationService.deleteInstallation(installationId))

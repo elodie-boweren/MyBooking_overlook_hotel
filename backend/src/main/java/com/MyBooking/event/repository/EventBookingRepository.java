@@ -127,6 +127,8 @@ public interface EventBookingRepository extends JpaRepository<EventBooking, Long
     @EntityGraph(attributePaths = {"event", "client", "reservation"})
     Page<EventBooking> findByStatus(EventBookingStatus status, Pageable pageable);
 
+    long countByEventIdAndStatus(Long eventId, EventBookingStatus status);
+
     // ==================== DATE AND TIME-BASED QUERIES ====================
     
     /**

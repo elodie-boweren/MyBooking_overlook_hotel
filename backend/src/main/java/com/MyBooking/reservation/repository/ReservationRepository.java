@@ -121,6 +121,8 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
      */
     long countByRoomIdAndStatus(Long roomId, ReservationStatus status);
 
+    boolean existsByRoomIdAndStatusAndCheckOutGreaterThanEqual(Long roomId, ReservationStatus status, LocalDate date);
+
     // ==================== STATUS-BASED QUERIES ====================
     
     /**

@@ -280,30 +280,48 @@ class EventServiceTest {
         futureEvent.setName("Future Event");
         futureEvent.setStartAt(LocalDateTime.now().plusDays(2)); // More than 24 hours away
         
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(futureEvent));
-        when(eventBookingRepository.findByEventId(1L)).thenReturn(Collections.emptyList());
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(futureEvent));
+        when(eventBookingRepository.countByEventIdAndStatus(1L, EventBookingStatus.CONFIRMED)).thenReturn(0L);
         doNothing().when(eventRepository).delete(any(Event.class));
 
         // When
         eventService.deleteEvent(1L, "Test deletion");
 
         // Then
-        verify(eventRepository).findById(1L);
-        verify(eventBookingRepository).findByEventId(1L);
+        verify(eventRepository).findByIdForUpdate(1L);
+        verify(eventBookingRepository).countByEventIdAndStatus(1L, EventBookingStatus.CONFIRMED);
         verify(eventRepository).delete(any(Event.class));
+    }
+
+    @Test
+    void deleteEvent_WithConfirmedBookings_ShouldThrowBusinessRuleException() {
+        Event futureEvent = new Event();
+        futureEvent.setId(1L);
+        futureEvent.setName("Future Event");
+        futureEvent.setStartAt(LocalDateTime.now().plusDays(2));
+
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(futureEvent));
+        when(eventBookingRepository.countByEventIdAndStatus(1L, EventBookingStatus.CONFIRMED)).thenReturn(2L);
+
+        assertThatThrownBy(() -> eventService.deleteEvent(1L, "Test deletion"))
+            .isInstanceOf(BusinessRuleException.class)
+            .hasMessageContaining("Cannot delete event with 2 confirmed booking(s)");
+
+        verify(eventRepository).findByIdForUpdate(1L);
+        verify(eventRepository, never()).delete(any());
     }
 
     @Test
     void deleteEvent_WithNonExistentEvent_ShouldThrowNotFoundException() {
         // Given
-        when(eventRepository.findById(999L)).thenReturn(Optional.empty());
+        when(eventRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> eventService.deleteEvent(999L, "Test deletion"))
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining("Event not found with ID: 999");
 
-        verify(eventRepository).findById(999L);
+        verify(eventRepository).findByIdForUpdate(999L);
         verify(eventRepository, never()).delete(any());
     }
 
@@ -314,14 +332,14 @@ class EventServiceTest {
         soonEvent.setId(1L);
         soonEvent.setStartAt(LocalDateTime.now().plusHours(12)); // Within 24 hours
 
-        when(eventRepository.findById(1L)).thenReturn(Optional.of(soonEvent));
+        when(eventRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(soonEvent));
 
         // When & Then
         assertThatThrownBy(() -> eventService.deleteEvent(1L, "Test deletion"))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Cannot delete events that start within 24 hours");
 
-        verify(eventRepository).findById(1L);
+        verify(eventRepository).findByIdForUpdate(1L);
         verify(eventRepository, never()).delete(any());
     }
 

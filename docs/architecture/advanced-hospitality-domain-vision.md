@@ -410,6 +410,14 @@ To guarantee that the platform functions correctly under seasonal peaks:
      - *Streaming Micro-Batch Plane*: Buffer Kafka events in memory and flush vectorized batches (every 1,000 records or 500 ms) to ClickHouse, preventing columnar part fragmentation.
      - *Scheduled Batch Rollup Plane*: Execute the **02:00 AM Night Audit Rollup** (finalizing official daily ADR, RevPAR, Occupancy), hourly **Pacing & Pickup** curve jobs, **Comp-Set Indexing** (MPI, ARI, RGI), and 3-sigma cancellation anomaly alerts.
 
+4. **Department-Adaptive Dashboards & ABAC Workforce Routing (`CAP-IND-009`, `ADR-0017`)**:
+   - **Authorization Model**: Coarse-grained Spring Security / Keycloak roles (`CLIENT`, `EMPLOYEE`, `ADMIN`) control system privileges, while `Department` (`FRONT_DESK`, `HOUSEKEEPING`, `MAINTENANCE`, `FOOD_AND_BEVERAGE`, `MANAGEMENT`, `SECURITY`) acts as an **ABAC attribute** (avoiding role explosion).
+   - **Evolution**:
+     - *Phase 03 (`P3-T08`)*: Persist `department` on `Employee`, expose it in employee profile DTOs, and scope `Announcement` visibility by `targetDepartment` and `targetRole`.
+     - *Milestone IdP*: Emit `department` as a Keycloak OIDC JWT claim.
+     - *Phase 04*: Tag `EmployeeTask` with `department` for routed departmental task queues, alongside Housekeeping Room Credits and SOP Checklists.
+     - *Next.js UI & Phase 14 (Tauri Workstation)*: Render **Department-Adaptive Dashboards** tailored to the authenticated employee's `department` (e.g., Front Desk Arrivals/Keycards vs. Housekeeping Room Board vs. Maintenance Repair/IoT Alerts vs. F&B Banquet BEOs).
+
 ---
 
 ## 7. Comprehensive Roadmap Traceability Matrix
@@ -426,7 +434,7 @@ Every proposed capability maps strictly into our existing 15-phase sequence:
 | `CAP-IND-006` | Ancillary Inventory, Dining & Spa | Standard | **Phase 04** | Model Outlets & Menus | Phase 4 |
 | `CAP-IND-007` | Multi-Dimensional Feedback & NPS | Standard | **Phase 04 / Phase 05** | Category stars + Outbox triggers | Phase 4 & Phase 5 |
 | `CAP-IND-008` | Banquet Event Orders (BEO), Layouts & Buffers | Standard | **Phase 04** | Turnaround buffers, seating styles, blackouts | Phase 4 |
-| `CAP-IND-009` | Workforce Credits, SOP Checklists & Shift Swaps | Standard | **Phase 04 / Phase 08** | Credits & SOP in P4; Swaps in P8 | Phase 4 & Phase 8 |
+| `CAP-IND-009` | Department-Adaptive Dashboards, Credits & Shift Swaps | Standard | **Phase 03 / 04 / 08 / 14** | Dept ABAC in P3/IdP; Tasks/Credits in P4; Swaps in P8; Tauri views in P14 | Phase 3 – 14 |
 | `CAP-DIFF-001`| AI Guest Concierge & Copilot | Overlook | **Phase 11** | Core deliverable of Phase 11 | Phase 11 |
 | `CAP-DIFF-002`| Smart-Room IoT Personalization | Overlook | **Phase 12** | Core deliverable of Phase 12 | Phase 12 |
 | `CAP-DIFF-003`| Housekeeping Robotics Fleet | Overlook | **Phase 13** | Core deliverable of Phase 13 | Phase 13 |

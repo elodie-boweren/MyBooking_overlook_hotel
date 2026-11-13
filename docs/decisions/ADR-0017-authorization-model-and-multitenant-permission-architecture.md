@@ -67,8 +67,9 @@ How should MyBooking structure its authorization architecture across tenants, wh
    - The user's assigned property IDs (`Set<Long> assignedPropertyIds`) are loaded into domain security context and compared against the target entity's `property_id`.
    - Guest ownership verifies `resource.clientId == principal.id`.
 3. **Tier 3 — ABAC (Contextual & Business Rules)**:
-   - Evaluates dynamic environmental attributes: employee active shift status, current time window, room occupancy status, geofencing coordinates.
-   - For example: an employee may only update housekeeping status on a room if their scheduled shift is currently active.
+   - Evaluates dynamic environmental and organizational attributes: employee `department` (`FRONT_DESK`, `HOUSEKEEPING`, `MAINTENANCE`, `FOOD_AND_BEVERAGE`, `MANAGEMENT`, `SECURITY`), active shift status, current time window, room occupancy status, geofencing coordinates.
+   - **Avoiding Role Explosion**: Rather than polluting RBAC with fine-grained job roles (`ROLE_HOUSEKEEPER`, `ROLE_CHEF`, `ROLE_RECEPTIONIST`), `Department` is modeled as a first-class ABAC attribute on `Employee` (introduced in Phase 3 `P3-T08` and emitted as a Keycloak OIDC claim in Milestone IdP). It drives department-adaptive UI dashboards, announcement audience scoping (`INV-ANN-001`), and operational task queue routing (Phase 04).
+   - For example: an employee may only update housekeeping status on a room if their scheduled shift is currently active, and only view announcements targeted to `Department.ALL` or their own `department`.
 
 ### 2. Policy Enforcement Points (PEP) & Decision Points (PDP)
 - **Policy Enforcement Point (PEP)**: Located directly within Spring Security method interceptors and domain application services. The PEP intercepts incoming invocations, collects contextual attributes (`UserPrincipal`, target entity, environmental state), queries the PDP, and throws `AccessDeniedException` if rejected.

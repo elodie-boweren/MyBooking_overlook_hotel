@@ -48,13 +48,13 @@ PHASE 15: Kubernetes DevSecOps Deployment & Production Hardening
 * **Dependencies**: Phase 02.
 
 ### MILESTONE IdP: Keycloak Identity Provider Adoption, Next.js BFF & Public UUIDv7 Architecture
-* **Objective**: Adopt Keycloak as centralized OAuth2/OIDC authority, eliminate browser token storage via Next.js BFF, migrate user credentials with forced password reset, enable asymmetric JWKS token verification, and implement the Dual-Key Public UUIDv7 pattern (ADR-0021) for defense-in-depth and anti-enumeration.
-* **Scope**: Docker Compose Keycloak deployment, realm-as-code configuration (`mybooking-platform`), user account migration preserving `app_user.id`, Next.js BFF server routes with encrypted `HttpOnly` session cookies, Spring Security Resource Server JWKS integration, `public_id UUID` (UUIDv7) schema and entity integration across core aggregates (`User`, `Room`, `Reservation`, `Feedback`, `Event`), dual-lookup repository support, DTO contract exposure, positive/negative integration tests.
+* **Objective**: Adopt Keycloak as centralized OAuth2/OIDC authority, eliminate browser token storage via Next.js BFF, migrate user credentials with forced password reset, enable asymmetric JWKS token verification with `department` ABAC OIDC claims for department-adaptive dashboards, and implement the Dual-Key Public UUIDv7 pattern (ADR-0021) for defense-in-depth and anti-enumeration.
+* **Scope**: Docker Compose Keycloak deployment, realm-as-code configuration (`mybooking-platform`), user account migration preserving `app_user.id`, `department` OIDC claim mapping, Next.js BFF server routes with encrypted `HttpOnly` session cookies and department-adaptive UI routing, Spring Security Resource Server JWKS integration, `public_id UUID` (UUIDv7) schema and entity integration across core aggregates (`User`, `Room`, `Reservation`, `Feedback`, `Event`), dual-lookup repository support, DTO contract exposure, positive/negative integration tests.
 * **Deliverables**: Self-hosted Keycloak service, asymmetric RS256/ES256 verification, zero `localStorage` tokens, non-enumerable public UUIDv7 endpoints, ADR-0004, ADR-0016, ADR-0021.
 * **Dependencies**: Phase 03.
 
 ### PHASE 04: Modular Monolith Bounded Contexts & PostgreSQL Schema Isolation
-* **Objective**: Separate the monolithic PostgreSQL schema into logical schemas (`auth`, `inventory`, `booking`, `loyalty`, `operations`) via Flyway migrations, reflecting the new externalized credential model, and introduce enterprise hospitality domain capabilities (Multi-Dimensional Feedback & NPS, Banquet Event Orders with seating layouts & turnaround buffers, Housekeeping Room Credits & SOP Checklists).
+* **Objective**: Separate the monolithic PostgreSQL schema into logical schemas (`auth`, `inventory`, `booking`, `loyalty`, `operations`) via Flyway migrations, reflecting the new externalized credential model, and introduce enterprise hospitality domain capabilities (Multi-Dimensional Feedback & NPS, Banquet Event Orders with seating layouts & turnaround buffers, Housekeeping Room Credits, SOP Checklists & department-routed `EmployeeTask` queues).
 * **Scope**: Flyway DDL scripts (`V9__*`), package-private encapsulation, eliminate cross-domain SQL joins, update Merise documentation (MCD, MLD, MPD in `modelisation/`).
 * **Deliverables**: Isolated schemas, rich hospitality domain aggregate models, ADR-0005, ADR-0017.
 * **Dependencies**: Milestone IdP.
@@ -114,8 +114,8 @@ PHASE 15: Kubernetes DevSecOps Deployment & Production Hardening
 * **Dependencies**: Phase 12.
 
 ### PHASE 14: Rust + Tauri Desktop Workstation Application
-* **Objective**: Build native desktop workstation application for hotel front desk and housekeeping administration with native keycard hardware support.
-* **Scope**: Tauri desktop shell (macOS/Windows/Linux), encrypted SQLite offline cache, hardware keycard encoder plugin.
+* **Objective**: Build native desktop workstation application with department-adaptive UI modes (Front Desk, Housekeeping, Maintenance, F&B, Management) and native keycard hardware support.
+* **Scope**: Tauri desktop shell (macOS/Windows/Linux), department-adaptive workspace rendering, encrypted SQLite offline cache, hardware keycard encoder plugin.
 * **Deliverables**: Standalone workstation installer, ADR-0004.
 * **Dependencies**: Phase 13.
 

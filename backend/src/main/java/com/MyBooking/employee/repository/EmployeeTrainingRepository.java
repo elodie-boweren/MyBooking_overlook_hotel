@@ -42,6 +42,17 @@ public interface EmployeeTrainingRepository extends JpaRepository<EmployeeTraini
     // Find by employee and training
     List<EmployeeTraining> findByEmployeeAndTraining(User employee, Training training);
     List<EmployeeTraining> findByEmployeeIdAndTrainingId(Long employeeId, Long trainingId);
+
+    @Query("SELECT CASE WHEN COUNT(et) > 0 THEN true ELSE false END " +
+           "FROM EmployeeTraining et JOIN et.training t " +
+           "WHERE et.employee = :employee " +
+           "AND et.status = com.MyBooking.employee.domain.TrainingStatus.IN_PROGRESS " +
+           "AND t.startDate <= :toDate AND t.endDate >= :fromDate")
+    boolean existsOverlappingInProgressTraining(
+        @Param("employee") User employee,
+        @Param("fromDate") java.time.LocalDate fromDate,
+        @Param("toDate") java.time.LocalDate toDate
+    );
     
     // ==================== DATE-BASED QUERIES ====================
     

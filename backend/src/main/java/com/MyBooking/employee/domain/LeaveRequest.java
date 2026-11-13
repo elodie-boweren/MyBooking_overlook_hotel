@@ -64,4 +64,8 @@ public class LeaveRequest {
     
     public String getReason() { return reason; }
     public void setReason(String reason) { this.reason = reason; }
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 }

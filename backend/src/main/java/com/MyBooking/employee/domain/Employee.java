@@ -80,4 +80,8 @@ public class Employee {
     
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 }

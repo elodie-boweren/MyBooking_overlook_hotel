@@ -15,7 +15,10 @@ public class JwtService {
     private String secretKey;
 
     @Value("${jwt.expiration:86400000}")
-    private long jwtExpiration; 
+    private long jwtExpiration;
+
+    private volatile SecretKey cachedSigningKey;
+    private volatile JwtParser cachedJwtParser;
 
     public String generateToken(Long userId, String username, String role) {
         return Jwts.builder()
@@ -35,10 +38,7 @@ public class JwtService {
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token);
+            getJwtParser().parseSignedClaims(token);
             return true; 
         } catch (JwtException | IllegalArgumentException e) {
             return false;
@@ -46,27 +46,21 @@ public class JwtService {
     }
     
     public String extractUsername(String token) {
-        return Jwts.parser()
-            .verifyWith(getSigningKey())
-            .build()
+        return getJwtParser()
             .parseSignedClaims(token)
             .getPayload()
             .getSubject();
     }
     
     public String extractRole(String token) {
-        return Jwts.parser()
-            .verifyWith(getSigningKey())
-            .build()
+        return getJwtParser()
             .parseSignedClaims(token)
             .getPayload()
             .get("role", String.class);
     }
 
     public Long extractUserId(String token) {
-        Object userId = Jwts.parser()
-            .verifyWith(getSigningKey())
-            .build()
+        Object userId = getJwtParser()
             .parseSignedClaims(token)
             .getPayload()
             .get("userId");
@@ -80,8 +74,22 @@ public class JwtService {
         return secretKey;
     }
 
+    private JwtParser getJwtParser() {
+        JwtParser parser = cachedJwtParser;
+        if (parser == null) {
+            parser = Jwts.parser().verifyWith(getSigningKey()).build();
+            cachedJwtParser = parser;
+        }
+        return parser;
+    }
+
     private SecretKey getSigningKey() {
-        byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
-        return Keys.hmacShaKeyFor(keyBytes);
+        SecretKey key = cachedSigningKey;
+        if (key == null) {
+            byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
+            key = Keys.hmacShaKeyFor(keyBytes);
+            cachedSigningKey = key;
+        }
+        return key;
     }
 }

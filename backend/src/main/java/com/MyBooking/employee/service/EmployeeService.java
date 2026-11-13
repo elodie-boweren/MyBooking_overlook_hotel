@@ -173,11 +173,9 @@ public class EmployeeService {
         // Check if employee has approved leave today (INV-EMP-001)
         LocalDate today = LocalDate.now();
         User employeeUser = employee.getUser();
-        List<LeaveRequest> leaveRequests = leaveRequestRepository.findByEmployeeAndStatus(employeeUser, LeaveRequestStatus.APPROVED);
-        for (LeaveRequest leave : leaveRequests) {
-            if (!today.isBefore(leave.getFromDate()) && !today.isAfter(leave.getToDate())) {
-                throw new BusinessRuleException("Cannot assign task to employee currently on approved leave");
-            }
+        if (leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                employeeUser, LeaveRequestStatus.APPROVED, today, today)) {
+            throw new BusinessRuleException("Cannot assign task to employee currently on approved leave");
         }
 
         EmployeeTask task = new EmployeeTask(employee.getUser(), title, description, TaskStatus.TODO);
@@ -269,7 +267,7 @@ public class EmployeeService {
      * Approve a leave request
      */
     public LeaveRequest approveLeaveRequest(Long requestId, String approverNote) {
-        LeaveRequest request = leaveRequestRepository.findById(requestId)
+        LeaveRequest request = leaveRequestRepository.findByIdForUpdate(requestId)
             .orElseThrow(() -> new NotFoundException("Leave request not found with ID: " + requestId));
 
         if (request.getStatus() != LeaveRequestStatus.PENDING) {
@@ -284,7 +282,7 @@ public class EmployeeService {
      * Reject a leave request
      */
     public LeaveRequest rejectLeaveRequest(Long requestId, String rejectionReason) {
-        LeaveRequest request = leaveRequestRepository.findById(requestId)
+        LeaveRequest request = leaveRequestRepository.findByIdForUpdate(requestId)
             .orElseThrow(() -> new NotFoundException("Leave request not found with ID: " + requestId));
 
         if (request.getStatus() != LeaveRequestStatus.PENDING) {
@@ -383,17 +381,7 @@ public class EmployeeService {
     @Transactional(readOnly = true)
     public boolean hasOverlappingTraining(Long employeeId, LocalDate fromDate, LocalDate toDate) {
         User employee = getEmployeeByUserId(employeeId).getUser();
-        List<EmployeeTraining> trainings = employeeTrainingRepository.findByEmployee(employee);
-        
-        for (EmployeeTraining training : trainings) {
-            if (training.getStatus() == TrainingStatus.IN_PROGRESS) {
-                Training t = training.getTraining();
-                if (!(t.getEndDate().isBefore(fromDate) || t.getStartDate().isAfter(toDate))) {
-                    return true;
-                }
-            }
-        }
-        return false;
+        return employeeTrainingRepository.existsOverlappingInProgressTraining(employee, fromDate, toDate);
     }
 
     /**
@@ -578,15 +566,8 @@ public class EmployeeService {
 
         // Check if employee has approved leave on this date
         User employeeUser = employee.getUser();
-        List<LeaveRequest> leaveRequests = leaveRequestRepository.findByEmployeeAndStatus(employeeUser, LeaveRequestStatus.APPROVED);
-        
-        for (LeaveRequest leave : leaveRequests) {
-            if (!date.isBefore(leave.getFromDate()) && !date.isAfter(leave.getToDate())) {
-                return false;
-            }
-        }
-
-        return true;
+        return !leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                employeeUser, LeaveRequestStatus.APPROVED, date, date);
     }
 
     /**
@@ -608,15 +589,8 @@ public class EmployeeService {
 
         // Check if employee has approved leave on this date (INV-EMP-001)
         User employeeUser = employee.getUser();
-        List<LeaveRequest> leaveRequests = leaveRequestRepository.findByEmployeeAndStatus(employeeUser, LeaveRequestStatus.APPROVED);
-        
-        for (LeaveRequest leave : leaveRequests) {
-            if (!date.isBefore(leave.getFromDate()) && !date.isAfter(leave.getToDate())) {
-                return false;
-            }
-        }
-
-        return true;
+        return !leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                employeeUser, LeaveRequestStatus.APPROVED, date, date);
     }
 
     /**

@@ -107,8 +107,8 @@ class ReservationServiceTest {
         // Given
         when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
-            .thenReturn(Collections.emptyList());
+        when(reservationRepository.countConflictingReservations(1L, testCheckIn, testCheckOut))
+            .thenReturn(0L);
         when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
         
         // When
@@ -125,7 +125,7 @@ class ReservationServiceTest {
         
         verify(roomRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(1L);
-        verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
+        verify(reservationRepository).countConflictingReservations(1L, testCheckIn, testCheckOut);
         verify(reservationRepository).save(any(Reservation.class));
         verify(roomService, never()).updateRoomStatusAutomatically(anyLong(), any(), anyString());
     }
@@ -256,8 +256,8 @@ class ReservationServiceTest {
         // Given
         when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
         when(userRepository.findById(1L)).thenReturn(Optional.of(testUser));
-        when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
-            .thenReturn(Arrays.asList(testReservation)); // Room has conflicting reservation
+        when(reservationRepository.countConflictingReservations(1L, testCheckIn, testCheckOut))
+            .thenReturn(1L); // Room has conflicting reservation
         
         // When & Then
         assertThatThrownBy(() -> reservationService.createReservation(1L, 1L, testCheckIn, testCheckOut, 2, "USD"))
@@ -266,7 +266,7 @@ class ReservationServiceTest {
         
         verify(roomRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(1L);
-        verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
+        verify(reservationRepository).countConflictingReservations(1L, testCheckIn, testCheckOut);
         verify(reservationRepository, never()).save(any());
     }
 
@@ -292,8 +292,8 @@ class ReservationServiceTest {
         
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
         when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
-        when(reservationRepository.checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L))
-            .thenReturn(Collections.emptyList());
+        when(reservationRepository.countConflictingReservations(1L, newCheckIn, newCheckOut, 1L))
+            .thenReturn(0L);
         when(reservationRepository.save(any(Reservation.class))).thenReturn(testReservation);
         
         // When
@@ -306,7 +306,7 @@ class ReservationServiceTest {
         
         verify(reservationRepository).findById(1L);
         verify(roomRepository).findByIdForUpdate(1L);
-        verify(reservationRepository).checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L);
+        verify(reservationRepository).countConflictingReservations(1L, newCheckIn, newCheckOut, 1L);
         verify(reservationRepository).save(testReservation);
     }
 
@@ -329,13 +329,11 @@ class ReservationServiceTest {
         // Given
         LocalDate newCheckIn = LocalDate.now().plusDays(5);
         LocalDate newCheckOut = LocalDate.now().plusDays(7);
-        Reservation conflictingReservation = new Reservation();
-        conflictingReservation.setId(99L);
         
         when(reservationRepository.findById(1L)).thenReturn(Optional.of(testReservation));
         when(roomRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testRoom));
-        when(reservationRepository.checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L))
-            .thenReturn(List.of(conflictingReservation));
+        when(reservationRepository.countConflictingReservations(1L, newCheckIn, newCheckOut, 1L))
+            .thenReturn(1L);
         
         // When & Then
         assertThatThrownBy(() -> reservationService.updateReservation(1L, newCheckIn, newCheckOut, 2, "USD"))
@@ -344,7 +342,7 @@ class ReservationServiceTest {
         
         verify(reservationRepository).findById(1L);
         verify(roomRepository).findByIdForUpdate(1L);
-        verify(reservationRepository).checkRoomAvailability(1L, newCheckIn, newCheckOut, 1L);
+        verify(reservationRepository).countConflictingReservations(1L, newCheckIn, newCheckOut, 1L);
         verify(reservationRepository, never()).save(any());
     }
 
@@ -420,29 +418,29 @@ class ReservationServiceTest {
     @Test
     void isRoomAvailable_WithAvailableRoom_ShouldReturnTrue() {
         // Given
-        when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
-            .thenReturn(Collections.emptyList());
+        when(reservationRepository.countConflictingReservations(1L, testCheckIn, testCheckOut))
+            .thenReturn(0L);
         
         // When
         boolean result = reservationService.isRoomAvailable(1L, testCheckIn, testCheckOut);
         
         // Then
         assertThat(result).isTrue();
-        verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
+        verify(reservationRepository).countConflictingReservations(1L, testCheckIn, testCheckOut);
     }
 
     @Test
     void isRoomAvailable_WithConflictingReservation_ShouldReturnFalse() {
         // Given
-        when(reservationRepository.checkRoomAvailability(1L, testCheckIn, testCheckOut))
-            .thenReturn(Arrays.asList(testReservation));
+        when(reservationRepository.countConflictingReservations(1L, testCheckIn, testCheckOut))
+            .thenReturn(1L);
         
         // When
         boolean result = reservationService.isRoomAvailable(1L, testCheckIn, testCheckOut);
         
         // Then
         assertThat(result).isFalse();
-        verify(reservationRepository).checkRoomAvailability(1L, testCheckIn, testCheckOut);
+        verify(reservationRepository).countConflictingReservations(1L, testCheckIn, testCheckOut);
     }
 
     @Test

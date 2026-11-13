@@ -70,7 +70,8 @@ public class AnnouncementService {
      */
     public Announcement updateAnnouncement(Long announcementId, String title, String content, 
                                          AnnouncementPriority priority) {
-        Announcement announcement = getAnnouncementById(announcementId);
+        Announcement announcement = announcementRepository.findByIdForUpdate(announcementId)
+            .orElseThrow(() -> new NotFoundException("Announcement not found with ID: " + announcementId));
         
         // Check if announcement is archived
         if (announcement.getStatus() == AnnouncementStatus.ARCHIVED) {
@@ -95,7 +96,8 @@ public class AnnouncementService {
      * Archive an announcement
      */
     public Announcement archiveAnnouncement(Long announcementId) {
-        Announcement announcement = getAnnouncementById(announcementId);
+        Announcement announcement = announcementRepository.findByIdForUpdate(announcementId)
+            .orElseThrow(() -> new NotFoundException("Announcement not found with ID: " + announcementId));
         
         // Check if announcement is already archived
         if (announcement.getStatus() == AnnouncementStatus.ARCHIVED) {
@@ -110,7 +112,8 @@ public class AnnouncementService {
      * Unarchive an announcement (restore to published)
      */
     public Announcement unarchiveAnnouncement(Long announcementId) {
-        Announcement announcement = getAnnouncementById(announcementId);
+        Announcement announcement = announcementRepository.findByIdForUpdate(announcementId)
+            .orElseThrow(() -> new NotFoundException("Announcement not found with ID: " + announcementId));
         
         // Check if announcement is not archived
         if (announcement.getStatus() != AnnouncementStatus.ARCHIVED) {
@@ -125,7 +128,8 @@ public class AnnouncementService {
      * Delete an announcement
      */
     public void deleteAnnouncement(Long announcementId) {
-        Announcement announcement = getAnnouncementById(announcementId);
+        Announcement announcement = announcementRepository.findByIdForUpdate(announcementId)
+            .orElseThrow(() -> new NotFoundException("Announcement not found with ID: " + announcementId));
         
         // Check if announcement has replies
         if (announcementReplyRepository.existsByAnnouncement(announcement)) {
@@ -150,8 +154,9 @@ public class AnnouncementService {
      * Add a reply to an announcement
      */
     public AnnouncementReply addReply(Long announcementId, Long userId, String message) {
-        // Validate announcement exists and is published
-        Announcement announcement = getAnnouncementById(announcementId);
+        // Lock announcement row to serialize against concurrent archive/delete
+        Announcement announcement = announcementRepository.findByIdForUpdate(announcementId)
+            .orElseThrow(() -> new NotFoundException("Announcement not found with ID: " + announcementId));
         
         if (announcement.getStatus() != AnnouncementStatus.PUBLISHED) {
             throw new BusinessRuleException("Cannot reply to non-published announcement");

@@ -61,6 +61,10 @@ public class Announcement {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
     
     // Constructors
     public Announcement() {}

@@ -3,9 +3,11 @@ package com.MyBooking.employee.repository;
 import com.MyBooking.auth.domain.User;
 import com.MyBooking.employee.domain.LeaveRequest;
 import com.MyBooking.employee.domain.LeaveRequestStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,6 +20,17 @@ import java.util.Optional;
 public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long> {
     
     // ==================== BASIC QUERIES ====================
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT lr FROM LeaveRequest lr WHERE lr.id = :id")
+    Optional<LeaveRequest> findByIdForUpdate(@Param("id") Long id);
+
+    boolean existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+        User employee,
+        LeaveRequestStatus status,
+        LocalDate dateForFrom,
+        LocalDate dateForTo
+    );
     
     /**
      * Find all leave requests for a specific employee

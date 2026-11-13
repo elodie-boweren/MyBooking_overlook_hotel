@@ -1,7 +1,9 @@
 package com.MyBooking.announcement.repository;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.data.domain.Page;
@@ -24,6 +26,10 @@ public interface AnnouncementRepository extends JpaRepository<Announcement, Long
     @Override
     @EntityGraph(attributePaths = {"createdBy"})
     Page<Announcement> findAll(Pageable pageable);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT a FROM Announcement a WHERE a.id = :id")
+    java.util.Optional<Announcement> findByIdForUpdate(@Param("id") Long id);
 
     // Find by created by user (entity-based)
     List<Announcement> findByCreatedBy(User createdBy);

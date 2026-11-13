@@ -314,13 +314,12 @@ class EmployeeServiceTest {
     @Test
     void createTask_WithEmployeeOnApprovedLeave_ShouldThrowBusinessRuleException() {
         // Given
-        LeaveRequest approvedLeave = new LeaveRequest(testUser, LocalDate.now().minusDays(1), LocalDate.now().plusDays(2),
-                LeaveRequestStatus.APPROVED, "Medical leave");
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(employeeTrainingRepository.existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS))
             .thenReturn(false);
-        when(leaveRequestRepository.findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED))
-            .thenReturn(Arrays.asList(approvedLeave));
+        when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                eq(testUser), eq(LeaveRequestStatus.APPROVED), any(LocalDate.class), any(LocalDate.class)))
+            .thenReturn(true);
 
         // When & Then
         assertThatThrownBy(() -> employeeService.createTask(1L, "Clean Room 101", "Deep clean room 101"))
@@ -394,7 +393,7 @@ class EmployeeServiceTest {
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(leaveRequestRepository.findOverlappingLeaveRequestsForEmployeeId(1L, fromDate, toDate))
             .thenReturn(Collections.emptyList());
-        when(employeeTrainingRepository.findByEmployee(testUser)).thenReturn(Collections.emptyList());
+        when(employeeTrainingRepository.existsOverlappingInProgressTraining(testUser, fromDate, toDate)).thenReturn(false);
         when(leaveRequestRepository.save(any(LeaveRequest.class))).thenReturn(testLeaveRequest);
 
         // When
@@ -467,7 +466,7 @@ class EmployeeServiceTest {
     @Test
     void approveLeaveRequest_WithValidRequest_ShouldApproveRequest() {
         // Given
-        when(leaveRequestRepository.findById(1L)).thenReturn(Optional.of(testLeaveRequest));
+        when(leaveRequestRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testLeaveRequest));
         when(leaveRequestRepository.save(any(LeaveRequest.class))).thenReturn(testLeaveRequest);
 
         // When
@@ -477,7 +476,7 @@ class EmployeeServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getStatus()).isEqualTo(LeaveRequestStatus.APPROVED);
 
-        verify(leaveRequestRepository).findById(1L);
+        verify(leaveRequestRepository).findByIdForUpdate(1L);
         verify(leaveRequestRepository).save(any(LeaveRequest.class));
     }
 
@@ -485,14 +484,14 @@ class EmployeeServiceTest {
     void approveLeaveRequest_WithNonPendingRequest_ShouldThrowBusinessRuleException() {
         // Given
         testLeaveRequest.setStatus(LeaveRequestStatus.APPROVED);
-        when(leaveRequestRepository.findById(1L)).thenReturn(Optional.of(testLeaveRequest));
+        when(leaveRequestRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testLeaveRequest));
 
         // When & Then
         assertThatThrownBy(() -> employeeService.approveLeaveRequest(1L, "Approved"))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Only pending leave requests can be approved");
 
-        verify(leaveRequestRepository).findById(1L);
+        verify(leaveRequestRepository).findByIdForUpdate(1L);
         verify(leaveRequestRepository, never()).save(any());
     }
 
@@ -503,7 +502,8 @@ class EmployeeServiceTest {
         // Given
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(trainingRepository.findById(1L)).thenReturn(Optional.of(testTraining));
-        when(employeeTrainingRepository.findByEmployee(testUser)).thenReturn(Collections.emptyList());
+        when(employeeTrainingRepository.existsOverlappingInProgressTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
+            .thenReturn(false);
         when(employeeTrainingRepository.existsByEmployeeAndTraining(testUser, testTraining)).thenReturn(false);
         when(employeeTrainingRepository.save(any(EmployeeTraining.class))).thenReturn(testEmployeeTraining);
 
@@ -524,10 +524,10 @@ class EmployeeServiceTest {
     @Test
     void assignTraining_WithOverlappingTraining_ShouldThrowBusinessRuleException() {
         // Given
-        testEmployeeTraining.setStatus(TrainingStatus.IN_PROGRESS);
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(trainingRepository.findById(1L)).thenReturn(Optional.of(testTraining));
-        when(employeeTrainingRepository.findByEmployee(testUser)).thenReturn(Arrays.asList(testEmployeeTraining));
+        when(employeeTrainingRepository.existsOverlappingInProgressTraining(eq(testUser), any(LocalDate.class), any(LocalDate.class)))
+            .thenReturn(true);
 
         // When & Then
         assertThatThrownBy(() -> employeeService.assignTraining(1L, 1L))
@@ -580,8 +580,9 @@ class EmployeeServiceTest {
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(employeeTrainingRepository.existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS))
             .thenReturn(false);
-        when(leaveRequestRepository.findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED))
-            .thenReturn(Collections.emptyList());
+        when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                testUser, LeaveRequestStatus.APPROVED, date, date))
+            .thenReturn(false);
 
         // When
         boolean result = employeeService.isEmployeeAvailableForShift(1L, date);
@@ -590,7 +591,8 @@ class EmployeeServiceTest {
         assertThat(result).isTrue();
         verify(employeeRepository, times(2)).findByUserId(1L); // Called twice: once in isEmployeeAvailableForShift, once in hasInProgressTraining
         verify(employeeTrainingRepository).existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS);
-        verify(leaveRequestRepository).findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED);
+        verify(leaveRequestRepository).existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                testUser, LeaveRequestStatus.APPROVED, date, date);
     }
 
     @Test
@@ -614,12 +616,12 @@ class EmployeeServiceTest {
     void isEmployeeAvailableForShift_WithApprovedLeave_ShouldReturnFalse() {
         // Given
         LocalDate date = LocalDate.now().plusDays(8); // Within leave period
-        testLeaveRequest.setStatus(LeaveRequestStatus.APPROVED);
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(employeeTrainingRepository.existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS))
             .thenReturn(false);
-        when(leaveRequestRepository.findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED))
-            .thenReturn(Arrays.asList(testLeaveRequest));
+        when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                testUser, LeaveRequestStatus.APPROVED, date, date))
+            .thenReturn(true);
 
         // When
         boolean result = employeeService.isEmployeeAvailableForShift(1L, date);
@@ -628,7 +630,8 @@ class EmployeeServiceTest {
         assertThat(result).isFalse();
         verify(employeeRepository, times(2)).findByUserId(1L); // Called twice: once in isEmployeeAvailableForShift, once in hasInProgressTraining
         verify(employeeTrainingRepository).existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS);
-        verify(leaveRequestRepository).findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED);
+        verify(leaveRequestRepository).existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                testUser, LeaveRequestStatus.APPROVED, date, date);
     }
 
     @Test
@@ -665,13 +668,12 @@ class EmployeeServiceTest {
     @Test
     void isEmployeeAvailableForTask_WithApprovedLeave_ShouldReturnFalse() {
         // Given
-        LeaveRequest approvedLeave = new LeaveRequest(testUser, LocalDate.now().minusDays(1), LocalDate.now().plusDays(2),
-                LeaveRequestStatus.APPROVED, "Vacation");
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(employeeTrainingRepository.existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS))
             .thenReturn(false);
-        when(leaveRequestRepository.findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED))
-            .thenReturn(Arrays.asList(approvedLeave));
+        when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                eq(testUser), eq(LeaveRequestStatus.APPROVED), any(LocalDate.class), any(LocalDate.class)))
+            .thenReturn(true);
 
         // When
         boolean result = employeeService.isEmployeeAvailableForTask(1L);
@@ -695,8 +697,9 @@ class EmployeeServiceTest {
         when(employeeRepository.findByUserId(1L)).thenReturn(Optional.of(testEmployee));
         when(employeeTrainingRepository.existsByEmployeeAndStatus(testUser, TrainingStatus.IN_PROGRESS))
             .thenReturn(false);
-        when(leaveRequestRepository.findByEmployeeAndStatus(testUser, LeaveRequestStatus.APPROVED))
-            .thenReturn(Collections.emptyList());
+        when(leaveRequestRepository.existsByEmployeeAndStatusAndFromDateLessThanEqualAndToDateGreaterThanEqual(
+                eq(testUser), eq(LeaveRequestStatus.APPROVED), any(LocalDate.class), any(LocalDate.class)))
+            .thenReturn(false);
         when(shiftRepository.save(any(Shift.class))).thenReturn(existingShift);
 
         // When

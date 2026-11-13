@@ -315,11 +315,11 @@ public class ReservationService {
      * Check room availability for new reservation
      */
     private void checkRoomAvailability(Long roomId, LocalDate checkIn, LocalDate checkOut) {
-        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut);
+        long conflictCount = reservationRepository.countConflictingReservations(roomId, checkIn, checkOut);
         
-        if (!conflicts.isEmpty()) {
+        if (conflictCount > 0) {
             throw new BusinessRuleException("Room is not available for the selected dates. " +
-                "Conflicting reservations: " + conflicts.size());
+                "Conflicting reservations: " + conflictCount);
         }
     }
 
@@ -422,11 +422,11 @@ public class ReservationService {
      * Check room availability for reservation update (excluding current reservation)
      */
     private void checkRoomAvailabilityForUpdate(Long roomId, LocalDate checkIn, LocalDate checkOut, Long excludeReservationId) {
-        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut, excludeReservationId);
+        long conflictCount = reservationRepository.countConflictingReservations(roomId, checkIn, checkOut, excludeReservationId);
         
-        if (!conflicts.isEmpty()) {
+        if (conflictCount > 0) {
             throw new BusinessRuleException("Room is not available for the selected dates. " +
-                "Conflicting reservations: " + conflicts.size());
+                "Conflicting reservations: " + conflictCount);
         }
     }
 
@@ -437,8 +437,7 @@ public class ReservationService {
      */
     @Transactional(readOnly = true)
     public boolean isRoomAvailable(Long roomId, LocalDate checkIn, LocalDate checkOut) {
-        List<Reservation> conflicts = reservationRepository.checkRoomAvailability(roomId, checkIn, checkOut);
-        return conflicts.isEmpty();
+        return reservationRepository.countConflictingReservations(roomId, checkIn, checkOut) == 0;
     }
 
     /**

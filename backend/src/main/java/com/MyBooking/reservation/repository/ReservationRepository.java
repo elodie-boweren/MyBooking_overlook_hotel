@@ -248,6 +248,19 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     default List<Reservation> checkRoomAvailability(Long roomId, LocalDate checkIn, LocalDate checkOut) {
         return checkRoomAvailability(roomId, checkIn, checkOut, null);
     }
+
+    @Query("SELECT COUNT(r) FROM Reservation r WHERE r.room.id = :roomId " +
+           "AND r.status = 'CONFIRMED' " +
+           "AND (:excludeReservationId IS NULL OR r.id != :excludeReservationId) " +
+           "AND (r.checkIn < :checkOut AND r.checkOut > :checkIn)")
+    long countConflictingReservations(@Param("roomId") Long roomId,
+                                      @Param("checkIn") LocalDate checkIn,
+                                      @Param("checkOut") LocalDate checkOut,
+                                      @Param("excludeReservationId") Long excludeReservationId);
+
+    default long countConflictingReservations(Long roomId, LocalDate checkIn, LocalDate checkOut) {
+        return countConflictingReservations(roomId, checkIn, checkOut, null);
+    }
     
     /**
      * Find all reservations that overlap with the given date range.

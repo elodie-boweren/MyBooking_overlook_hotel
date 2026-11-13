@@ -149,7 +149,7 @@ class AnnouncementServiceTest {
     @Test
     void updateAnnouncement_WithValidData_ShouldUpdateAnnouncement() {
         // Given
-        when(announcementRepository.findById(1L)).thenReturn(Optional.of(testAnnouncement));
+        when(announcementRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testAnnouncement));
         when(announcementRepository.save(any(Announcement.class))).thenReturn(testAnnouncement);
 
         // When
@@ -162,14 +162,14 @@ class AnnouncementServiceTest {
         assertThat(result.getContent()).isEqualTo("Updated Content");
         assertThat(result.getPriority()).isEqualTo(AnnouncementPriority.MEDIUM);
 
-        verify(announcementRepository).findById(1L);
+        verify(announcementRepository).findByIdForUpdate(1L);
         verify(announcementRepository).save(testAnnouncement);
     }
 
     @Test
     void updateAnnouncement_WithArchivedAnnouncement_ShouldThrowBusinessRuleException() {
         // Given
-        when(announcementRepository.findById(2L)).thenReturn(Optional.of(testArchivedAnnouncement));
+        when(announcementRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(testArchivedAnnouncement));
 
         // When & Then
         assertThatThrownBy(() -> announcementService.updateAnnouncement(
@@ -177,14 +177,14 @@ class AnnouncementServiceTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Cannot update archived announcement");
 
-        verify(announcementRepository).findById(2L);
+        verify(announcementRepository).findByIdForUpdate(2L);
         verify(announcementRepository, never()).save(any());
     }
 
     @Test
     void updateAnnouncement_WithNonExistentAnnouncement_ShouldThrowNotFoundException() {
         // Given
-        when(announcementRepository.findById(999L)).thenReturn(Optional.empty());
+        when(announcementRepository.findByIdForUpdate(999L)).thenReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> announcementService.updateAnnouncement(
@@ -192,14 +192,14 @@ class AnnouncementServiceTest {
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining("Announcement not found with ID: 999");
 
-        verify(announcementRepository).findById(999L);
+        verify(announcementRepository).findByIdForUpdate(999L);
         verify(announcementRepository, never()).save(any());
     }
 
     @Test
     void archiveAnnouncement_WithPublishedAnnouncement_ShouldArchiveAnnouncement() {
         // Given
-        when(announcementRepository.findById(1L)).thenReturn(Optional.of(testAnnouncement));
+        when(announcementRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testAnnouncement));
         when(announcementRepository.save(any(Announcement.class))).thenReturn(testAnnouncement);
 
         // When
@@ -209,28 +209,28 @@ class AnnouncementServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getStatus()).isEqualTo(AnnouncementStatus.ARCHIVED);
 
-        verify(announcementRepository).findById(1L);
+        verify(announcementRepository).findByIdForUpdate(1L);
         verify(announcementRepository).save(testAnnouncement);
     }
 
     @Test
     void archiveAnnouncement_WithAlreadyArchivedAnnouncement_ShouldThrowBusinessRuleException() {
         // Given
-        when(announcementRepository.findById(2L)).thenReturn(Optional.of(testArchivedAnnouncement));
+        when(announcementRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(testArchivedAnnouncement));
 
         // When & Then
         assertThatThrownBy(() -> announcementService.archiveAnnouncement(2L))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Announcement is already archived");
 
-        verify(announcementRepository).findById(2L);
+        verify(announcementRepository).findByIdForUpdate(2L);
         verify(announcementRepository, never()).save(any());
     }
 
     @Test
     void unarchiveAnnouncement_WithArchivedAnnouncement_ShouldUnarchiveAnnouncement() {
         // Given
-        when(announcementRepository.findById(2L)).thenReturn(Optional.of(testArchivedAnnouncement));
+        when(announcementRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(testArchivedAnnouncement));
         when(announcementRepository.save(any(Announcement.class))).thenReturn(testArchivedAnnouncement);
 
         // When
@@ -240,35 +240,35 @@ class AnnouncementServiceTest {
         assertThat(result).isNotNull();
         assertThat(result.getStatus()).isEqualTo(AnnouncementStatus.PUBLISHED);
 
-        verify(announcementRepository).findById(2L);
+        verify(announcementRepository).findByIdForUpdate(2L);
         verify(announcementRepository).save(testArchivedAnnouncement);
     }
 
     @Test
     void unarchiveAnnouncement_WithPublishedAnnouncement_ShouldThrowBusinessRuleException() {
         // Given
-        when(announcementRepository.findById(1L)).thenReturn(Optional.of(testAnnouncement));
+        when(announcementRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testAnnouncement));
 
         // When & Then
         assertThatThrownBy(() -> announcementService.unarchiveAnnouncement(1L))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Only archived announcements can be unarchived");
 
-        verify(announcementRepository).findById(1L);
+        verify(announcementRepository).findByIdForUpdate(1L);
         verify(announcementRepository, never()).save(any());
     }
 
     @Test
     void deleteAnnouncement_WithNoReplies_ShouldDeleteAnnouncement() {
         // Given
-        when(announcementRepository.findById(1L)).thenReturn(Optional.of(testAnnouncement));
+        when(announcementRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testAnnouncement));
         when(announcementReplyRepository.existsByAnnouncement(testAnnouncement)).thenReturn(false);
 
         // When
         announcementService.deleteAnnouncement(1L);
 
         // Then
-        verify(announcementRepository).findById(1L);
+        verify(announcementRepository).findByIdForUpdate(1L);
         verify(announcementReplyRepository).existsByAnnouncement(testAnnouncement);
         verify(announcementRepository).delete(testAnnouncement);
     }
@@ -276,7 +276,7 @@ class AnnouncementServiceTest {
     @Test
     void deleteAnnouncement_WithReplies_ShouldThrowBusinessRuleException() {
         // Given
-        when(announcementRepository.findById(1L)).thenReturn(Optional.of(testAnnouncement));
+        when(announcementRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testAnnouncement));
         when(announcementReplyRepository.existsByAnnouncement(testAnnouncement)).thenReturn(true);
 
         // When & Then
@@ -284,7 +284,7 @@ class AnnouncementServiceTest {
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Cannot delete announcement with replies");
 
-        verify(announcementRepository).findById(1L);
+        verify(announcementRepository).findByIdForUpdate(1L);
         verify(announcementReplyRepository).existsByAnnouncement(testAnnouncement);
         verify(announcementRepository, never()).delete(any());
     }
@@ -323,7 +323,7 @@ class AnnouncementServiceTest {
     @Test
     void addReply_WithValidData_ShouldAddReply() {
         // Given
-        when(announcementRepository.findById(1L)).thenReturn(Optional.of(testAnnouncement));
+        when(announcementRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testAnnouncement));
         when(userRepository.findById(2L)).thenReturn(Optional.of(testUser2));
         when(announcementReplyRepository.save(any(AnnouncementReply.class))).thenAnswer(invocation -> {
             AnnouncementReply reply = invocation.getArgument(0);
@@ -340,7 +340,7 @@ class AnnouncementServiceTest {
         assertThat(result.getAnnouncement()).isEqualTo(testAnnouncement);
         assertThat(result.getUser()).isEqualTo(testUser2);
 
-        verify(announcementRepository).findById(1L);
+        verify(announcementRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(2L);
         verify(announcementReplyRepository).save(any(AnnouncementReply.class));
     }
@@ -348,14 +348,14 @@ class AnnouncementServiceTest {
     @Test
     void addReply_WithArchivedAnnouncement_ShouldThrowBusinessRuleException() {
         // Given
-        when(announcementRepository.findById(2L)).thenReturn(Optional.of(testArchivedAnnouncement));
+        when(announcementRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(testArchivedAnnouncement));
 
         // When & Then
         assertThatThrownBy(() -> announcementService.addReply(2L, 2L, "Test reply message"))
             .isInstanceOf(BusinessRuleException.class)
             .hasMessageContaining("Cannot reply to non-published announcement");
 
-        verify(announcementRepository).findById(2L);
+        verify(announcementRepository).findByIdForUpdate(2L);
         verify(userRepository, never()).findById(any());
         verify(announcementReplyRepository, never()).save(any());
     }
@@ -363,7 +363,7 @@ class AnnouncementServiceTest {
     @Test
     void addReply_WithInvalidUser_ShouldThrowNotFoundException() {
         // Given
-        when(announcementRepository.findById(1L)).thenReturn(Optional.of(testAnnouncement));
+        when(announcementRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(testAnnouncement));
         when(userRepository.findById(999L)).thenReturn(Optional.empty());
 
         // When & Then
@@ -371,7 +371,7 @@ class AnnouncementServiceTest {
             .isInstanceOf(NotFoundException.class)
             .hasMessageContaining("User not found with ID: 999");
 
-        verify(announcementRepository).findById(1L);
+        verify(announcementRepository).findByIdForUpdate(1L);
         verify(userRepository).findById(999L);
         verify(announcementReplyRepository, never()).save(any());
     }

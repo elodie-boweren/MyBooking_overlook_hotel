@@ -58,14 +58,15 @@ public class AuthService {
      * Register a new user with specified role
      */
     public User registerUser(String email, String password, String firstName, String lastName, String phone, String address, LocalDate birthDate, Role role) {
+        String normalizedEmail = normalizeEmail(email);
         // Validate email uniqueness
-        if (userRepository.existsByEmail(email)) {
-            throw new BusinessRuleException("Email already exists: " + email);
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new BusinessRuleException("Email already exists: " + normalizedEmail);
         }
         
         // Create new user
         User user = new User();
-        user.setEmail(email);
+        user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(password));
         user.setFirstName(firstName);
         user.setLastName(lastName);
@@ -92,8 +93,9 @@ public class AuthService {
      * Authenticate user and generate JWT token
      */
     public String authenticateUser(String email, String password) {
-        User user = userRepository.findByEmail(email)
-            .orElseThrow(() -> new NotFoundException("User not found with email: " + email));
+        String normalizedEmail = normalizeEmail(email);
+        User user = userRepository.findByEmail(normalizedEmail)
+            .orElseThrow(() -> new NotFoundException("User not found with email: " + normalizedEmail));
         
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new BusinessRuleException("Invalid password");
@@ -108,8 +110,9 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public User getUserProfile(String email) {
-        return userRepository.findByEmail(email)
-            .orElseThrow(() -> new NotFoundException("User not found with email: " + email));
+        String normalizedEmail = normalizeEmail(email);
+        return userRepository.findByEmail(normalizedEmail)
+            .orElseThrow(() -> new NotFoundException("User not found with email: " + normalizedEmail));
     }
 
     /**
@@ -219,14 +222,15 @@ public class AuthService {
      */
     public User createUser(String email, String password, String firstName, String lastName, 
                           String phone, String address, LocalDate birthDate, Role role) {
+        String normalizedEmail = normalizeEmail(email);
         // Validate email uniqueness
-        if (userRepository.existsByEmail(email)) {
-            throw new BusinessRuleException("Email already exists: " + email);
+        if (userRepository.existsByEmail(normalizedEmail)) {
+            throw new BusinessRuleException("Email already exists: " + normalizedEmail);
         }
         
         // Create new user
         User user = new User();
-        user.setEmail(email);
+        user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(password));
         user.setFirstName(firstName);
         user.setLastName(lastName);
@@ -248,14 +252,16 @@ public class AuthService {
      */
     public User updateUser(Long userId, String email, String firstName, String lastName, 
                           String phone, String address, LocalDate birthDate, Role role) {
-        User user = getUserById(userId);
+        User user = userRepository.findByIdForUpdate(userId)
+            .orElseThrow(() -> new NotFoundException("User not found with ID: " + userId));
+        String normalizedEmail = normalizeEmail(email);
         
         // Check if email is being changed and if it's unique
-        if (!user.getEmail().equals(email) && userRepository.existsByEmail(email)) {
-            throw new BusinessRuleException("Email already exists: " + email);
+        if (!user.getEmail().equals(normalizedEmail) && userRepository.existsByEmail(normalizedEmail)) {
+            throw new BusinessRuleException("Email already exists: " + normalizedEmail);
         }
         
-        user.setEmail(email);
+        user.setEmail(normalizedEmail);
         user.setFirstName(firstName);
         user.setLastName(lastName);
         user.setPhone(phone);
@@ -264,6 +270,10 @@ public class AuthService {
         user.setRole(role);
         
         return userRepository.save(user);
+    }
+
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
     }
 
     /**

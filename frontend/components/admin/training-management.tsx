@@ -108,12 +108,12 @@ export default function AdminTrainingManagement() {
       console.log("Employees response:", employeesResponse)
       
       // Handle both array response and paginated response
-      let allEmployees
+      let allEmployees: any[]
       if (Array.isArray(employeesResponse)) {
         allEmployees = employeesResponse
         console.log("Response is direct array")
-      } else if (employeesResponse && employeesResponse.content) {
-        allEmployees = employeesResponse.content
+      } else if (employeesResponse && (employeesResponse as any).content) {
+        allEmployees = (employeesResponse as any).content
         console.log("Response is paginated object")
       } else {
         console.error("No employees response or invalid format")

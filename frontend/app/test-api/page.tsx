@@ -195,9 +195,9 @@ export default function ApiTestPage() {
                   <ul className="list-disc list-inside space-y-1 text-sm text-muted-foreground">
                     <li>Make sure your Spring Boot backend is running on <code>http://localhost:8080</code></li>
                     <li>For authenticated endpoints, paste your JWT token in the token field</li>
-                    <li>Select a specific module to test or "All Modules" for comprehensive testing</li>
-                    <li>Click "Run Tests" to execute the API tests</li>
-                    <li>View results in the "Test Results" tab</li>
+                    <li>Select a specific module to test or &quot;All Modules&quot; for comprehensive testing</li>
+                    <li>Click &quot;Run Tests&quot; to execute the API tests</li>
+                    <li>View results in the &quot;Test Results&quot; tab</li>
                   </ul>
                 </div>
                 

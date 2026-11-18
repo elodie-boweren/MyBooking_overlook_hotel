@@ -265,7 +265,7 @@ export default function CalendarPage() {
             {/* Today's Summary */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Today's Summary</CardTitle>
+                <CardTitle className="text-lg">Today&apos;s Summary</CardTitle>
                 <CardDescription>{format(new Date(), "EEEE, MMMM dd")}</CardDescription>
               </CardHeader>
               <CardContent>

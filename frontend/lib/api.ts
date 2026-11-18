@@ -358,6 +358,10 @@ export interface User {
   phone: string
   address: string
   birthDate: string // LocalDate from backend
+  dateOfBirth?: string
+  city?: string
+  country?: string
+  postalCode?: string
   role: "CLIENT" | "EMPLOYEE" | "ADMIN"
   createdAt: string
   updatedAt: string
@@ -416,6 +420,8 @@ export interface Reservation {
   id: number
   checkIn: string // LocalDate from backend
   checkOut: string // LocalDate from backend
+  checkInDate?: string
+  checkOutDate?: string
   numberOfGuests: number
   totalPrice: number
   currency: string
@@ -452,17 +458,20 @@ export interface UpdateReservationRequest {
 // Event interfaces
 export interface Event {
   id: number
-  name: string
+  name?: string
+  title?: string
   description?: string
-  eventType: "SPA" | "CONFERENCE" | "YOGA_CLASS" | "FITNESS" | "WEDDING"
-  startAt: string // LocalDateTime from backend
-  endAt: string // LocalDateTime from backend
-  capacity: number
+  eventType: "SPA" | "CONFERENCE" | "YOGA_CLASS" | "FITNESS" | "WEDDING" | "WORKSHOP" | "MEETING" | "TRAINING" | "SOCIAL"
+  startAt?: string // LocalDateTime from backend
+  endAt?: string // LocalDateTime from backend
+  capacity?: number
+  maxCapacity?: number
   price: number
   currency: string
-  installationId: number
-  installationName: string
-  installationType: string
+  isActive?: boolean
+  installationId?: number
+  installationName?: string
+  installationType?: string
   createdAt: string
   updatedAt: string
 }
@@ -543,20 +552,6 @@ export interface UpdateEmployeeRequest {
   status?: "ACTIVE" | "INACTIVE"
 }
 
-// Event interface - matches backend exactly
-export interface Event {
-  id: number
-  title: string
-  description: string
-  eventType: "CONFERENCE" | "WORKSHOP" | "MEETING" | "TRAINING" | "SOCIAL"
-  maxCapacity: number
-  price: number
-  currency: string
-  isActive: boolean
-  createdAt: string
-  updatedAt: string
-}
-
 // Event Booking interface - matches backend exactly
 export interface EventBooking {
   id: number
@@ -579,6 +574,7 @@ export interface Feedback {
   id: number
   reservationId: number
   reservationNumber: string
+  reservation?: { roomNumber?: string }
   userId: number
   userName: string
   userEmail: string
@@ -589,6 +585,8 @@ export interface Feedback {
   replies?: FeedbackReply[] // Added feedback replies
   replyCount?: number
 }
+
+export type FeedbackResponse = Feedback
 
 // Feedback Reply interface - NEW, matches backend exactly
 export interface FeedbackReply {
@@ -658,8 +656,11 @@ export interface LeaveRequest {
   id: number
   employeeId: number
   employeeName: string
+  employee?: { firstName?: string; lastName?: string; email?: string }
   startDate: string
   endDate: string
+  fromDate?: string
+  toDate?: string
   reason: string
   status: "PENDING" | "APPROVED" | "REJECTED"
   createdAt: string
@@ -685,9 +686,10 @@ export interface EmployeeTraining {
   id: number
   employeeId: number
   employeeName: string
+  employeeEmail?: string
   trainingId: number
   trainingTitle: string
-  status: "ASSIGNED" | "COMPLETED"
+  status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   completionDate?: string
   createdAt: string
   updatedAt: string
@@ -699,6 +701,9 @@ export interface EmployeeTask {
   employeeId: number
   employeeName: string
   employeeEmail: string
+  assignedToName?: string
+  priority?: "LOW" | "MEDIUM" | "HIGH"
+  dueDate?: string
   title: string
   description: string
   status: "TODO" | "IN_PROGRESS" | "DONE"
@@ -760,11 +765,14 @@ export interface EmployeeTrainingAssignment {
   employeeEmail: string
   trainingId: number
   trainingTitle: string
+  trainingDescription?: string
   trainingStartDate: string
   trainingEndDate: string
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
   assignedAt: string
+  assignedDate?: string
   completedAt?: string
+  note?: string
   createdAt: string
   updatedAt: string
 }
@@ -876,8 +884,10 @@ export interface RedeemPointsRequest {
 }
 
 export interface CreateLeaveRequestRequest {
-  startDate: string
-  endDate: string
+  startDate?: string
+  endDate?: string
+  fromDate?: string
+  toDate?: string
   reason: string
 }
 
@@ -886,15 +896,9 @@ export interface UpdateTaskRequest {
   note?: string
 }
 
-// Employee Dashboard Request/Response DTOs
-export interface CreateLeaveRequestRequest {
-  fromDate: string
-  toDate: string
-  reason: string
-}
-
 export interface UpdateTrainingStatusRequest {
   status: "ASSIGNED" | "IN_PROGRESS" | "COMPLETED"
+  note?: string
 }
 
 // Employee Training Assignment Request
@@ -944,6 +948,8 @@ export interface CalendarEvent {
 export interface TaskReply {
   id: number
   message: string
+  content?: string
+  attachments?: Array<{ id?: number | string; name?: string; url?: string }>
   createdAt: string
   employeeName: string
 }
@@ -1598,7 +1604,7 @@ export const adminTrainingApi = {
   getEmployeeTrainingsByTrainingId: async (trainingId: number): Promise<PaginatedResponse<EmployeeTraining>> => {
     // This endpoint doesn't exist in backend, we need to get all employee trainings and filter
     // For now, let's return empty array and handle this differently
-    return { content: [], totalElements: 0, totalPages: 0, size: 0, number: 0 }
+    return { content: [], totalElements: 0, totalPages: 0, size: 0, number: 0 } as unknown as PaginatedResponse<EmployeeTraining>
   }
 }
 

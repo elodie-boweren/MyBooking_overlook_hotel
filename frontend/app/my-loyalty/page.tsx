@@ -149,7 +149,7 @@ export default function MyLoyaltyPage() {
         <div className="text-center py-8 mb-8">
           <Star className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold">No Loyalty Account Found</h3>
-          <p className="text-muted-foreground mt-2">You don't have a loyalty account yet. Make a reservation to start earning points!</p>
+          <p className="text-muted-foreground mt-2">You don&apos;t have a loyalty account yet. Make a reservation to start earning points!</p>
         </div>
       )}
 
@@ -246,7 +246,7 @@ export default function MyLoyaltyPage() {
               <div className="text-center py-8">
                 <Gift className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                 <h3 className="text-lg font-semibold">Rewards Coming Soon</h3>
-                <p className="text-muted-foreground">We're working on exciting rewards for our loyal customers.</p>
+                <p className="text-muted-foreground">We&apos;re working on exciting rewards for our loyal customers.</p>
               </div>
             </CardContent>
           </Card>

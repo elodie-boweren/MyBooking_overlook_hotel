@@ -144,15 +144,15 @@ export default function AdminEventManagement() {
   const handleEditEvent = (event: Event) => {
     setSelectedEvent(event)
     setFormData({
-      name: event.name,
+      name: event.name || event.title || "",
       description: event.description || "",
-      eventType: event.eventType,
-      startAt: event.startAt,
-      endAt: event.endAt,
-      capacity: event.capacity,
+      eventType: (event.eventType || "SPA") as any,
+      startAt: event.startAt || "",
+      endAt: event.endAt || "",
+      capacity: event.capacity ?? event.maxCapacity ?? 1,
       price: event.price,
       currency: event.currency,
-      installationId: event.installationId
+      installationId: event.installationId ?? 0
     })
     setIsEditDialogOpen(true)
   }
@@ -172,7 +172,7 @@ export default function AdminEventManagement() {
   }
 
   const filteredEvents = events.filter(event => {
-    const matchesSearch = event.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    const matchesSearch = (event.name || event.title || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
                          event.description?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesType = eventTypeFilter === "all" || event.eventType === eventTypeFilter
     return matchesSearch && matchesType
@@ -420,7 +420,7 @@ export default function AdminEventManagement() {
                           <div className="flex items-center gap-4 text-sm text-muted-foreground">
                             <div className="flex items-center gap-1">
                               <Clock className="h-4 w-4" />
-                              {formatDateTime(event.startAt)} - {formatDateTime(event.endAt)}
+                              {formatDateTime(event.startAt || "")} - {formatDateTime(event.endAt || "")}
                             </div>
                             <div className="flex items-center gap-1">
                               <Users className="h-4 w-4" />

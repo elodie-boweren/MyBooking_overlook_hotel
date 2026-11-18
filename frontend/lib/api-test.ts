@@ -85,9 +85,9 @@ export class ApiTester {
     
     // Test employee endpoints
     console.log('Testing employee endpoints...')
-    results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEES.MY_PROFILE, 'GET', undefined, token))
-    results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEES.MY_TASKS, 'GET', undefined, token))
-    results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEES.MY_SHIFTS, 'GET', undefined, token))
+    results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEE.PROFILE, 'GET', undefined, token))
+    results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEE.TASKS, 'GET', undefined, token))
+    results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEE.SHIFTS, 'GET', undefined, token))
     
     // Test admin employee endpoints
     results.push(await this.testEndpoint(API_ENDPOINTS.ADMIN_EMPLOYEES.ALL, 'GET', undefined, token))
@@ -142,8 +142,8 @@ export class ApiTester {
         break
         
       case 'employees':
-        results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEES.MY_PROFILE, 'GET', undefined, token))
-        results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEES.MY_TASKS, 'GET', undefined, token))
+        results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEE.PROFILE, 'GET', undefined, token))
+        results.push(await this.testEndpoint(API_ENDPOINTS.EMPLOYEE.TASKS, 'GET', undefined, token))
         results.push(await this.testEndpoint(API_ENDPOINTS.ADMIN_EMPLOYEES.ALL, 'GET', undefined, token))
         break
         

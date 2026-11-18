@@ -494,7 +494,7 @@ export function EmployeeManagement() {
             <CardHeader>
               <CardTitle>Edit Employee</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Update {selectedEmployee.firstName} {selectedEmployee.lastName}'s information
+                Update {selectedEmployee.firstName} {selectedEmployee.lastName}&apos;s information
               </p>
             </CardHeader>
             <CardContent>

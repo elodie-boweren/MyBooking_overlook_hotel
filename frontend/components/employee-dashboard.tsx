@@ -151,7 +151,7 @@ export default function EmployeeDashboard() {
             Welcome back, Employee
           </h2>
           <p className="text-gray-600 mt-1">
-            Here's what's happening with your schedule today
+            Here&apos;s what&apos;s happening with your schedule today
           </p>
         </div>
 
@@ -264,7 +264,7 @@ export default function EmployeeDashboard() {
             <Card>
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Today's Tasks</CardTitle>
+                  <CardTitle className="text-lg">Today&apos;s Tasks</CardTitle>
                   <Button variant="outline" size="sm">
                     <Filter className="h-4 w-4" />
                   </Button>

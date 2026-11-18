@@ -60,7 +60,7 @@ export default function AdminFeedbackPage() {
     const matchesSearch = 
       feedback.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       feedback.userEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      feedback.comment.toLowerCase().includes(searchTerm.toLowerCase())
+      (feedback.comment || "").toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesRating = selectedRating === "all" || feedback.rating.toString() === selectedRating
     const matchesStatus = selectedStatus === "all" || 
@@ -292,7 +292,7 @@ export default function AdminFeedbackPage() {
                             <div className="flex items-center gap-2 mb-2">
                               <Reply className="h-4 w-4 text-blue-600" />
                               <span className="text-sm font-medium text-blue-800">
-                                Admin Reply {feedback.replies.length > 1 ? `#${index + 1}` : ''}:
+                                Admin Reply {(feedback.replies?.length ?? 0) > 1 ? `#${index + 1}` : ''}:
                               </span>
                               <span className="text-xs text-blue-600">
                                 by {reply.adminUserName}
@@ -334,7 +334,7 @@ export default function AdminFeedbackPage() {
               Reply to Feedback
             </DialogTitle>
             <DialogDescription>
-              Respond to {selectedFeedback?.userName}'s feedback
+              Respond to {selectedFeedback?.userName}&apos;s feedback
             </DialogDescription>
           </DialogHeader>
 

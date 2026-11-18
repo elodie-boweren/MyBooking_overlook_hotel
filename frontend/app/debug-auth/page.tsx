@@ -105,7 +105,7 @@ export default function DebugAuthPage() {
 
     try {
       // Decode JWT token (without verification)
-      const parts = token.split('.')
+      const parts = (token || '').split('.')
       if (parts.length !== 3) {
         setResult('Invalid JWT token format')
         return

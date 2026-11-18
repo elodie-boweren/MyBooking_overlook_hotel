@@ -35,6 +35,13 @@ build/
 ### macOS ###
 .DS_Store
 
+### Logs & Local Secrets ###
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+
 ### Local Working Notes & Governance ###
 RULES.md
 current_state_assessment_and_roadmap.md

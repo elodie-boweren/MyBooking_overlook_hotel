@@ -37,7 +37,7 @@ export default function MyFeedbackPage() {
         
         // Fetch user's reservations for feedback submission
         const reservationResponse = await reservationApi.getMyReservations()
-        setReservations(reservationResponse.content || [])
+        setReservations((reservationResponse.content || []) as any)
       } catch (error) {
         console.error('Failed to fetch feedback data:', error)
         toast.error("Failed to load feedback data")
@@ -171,7 +171,7 @@ export default function MyFeedbackPage() {
                       
                       return availableReservations.map((reservation) => (
                         <SelectItem key={reservation.id} value={reservation.id.toString()}>
-                          Room {reservation.roomNumber} - {new Date(reservation.checkInDate).toLocaleDateString()} to {new Date(reservation.checkOutDate).toLocaleDateString()}
+                          Room {reservation.roomNumber} - {new Date(reservation.checkInDate || reservation.checkIn).toLocaleDateString()} to {new Date(reservation.checkOutDate || reservation.checkOut).toLocaleDateString()}
                         </SelectItem>
                       ))
                     })()}
@@ -282,7 +282,7 @@ export default function MyFeedbackPage() {
                         <div className="flex items-center gap-2 mb-2">
                           <MessageSquare className="h-4 w-4" />
                           <span className="font-medium text-sm">
-                            Hotel Response {feedback.replies.length > 1 ? `#${index + 1}` : ''}
+                            Hotel Response {(feedback.replies?.length ?? 0) > 1 ? `#${index + 1}` : ''}
                           </span>
                           <span className="text-xs text-muted-foreground">
                             by {reply.adminUserName}

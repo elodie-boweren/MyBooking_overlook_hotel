@@ -1,0 +1,196 @@
+# =============================================================================
+# MyBooking — Milestone IdP Infrastructure Stack (IDP-T01)
+# 5 Segmented Logical Networks | Pinned Images | 127.0.0.1-Only Dev Bindings
+# =============================================================================
+# Network Isolation Matrix (SEC-IAM-006 / T-02):
+#   1. kc_db_net       (internal: true) : keycloak <-> keycloak-db ONLY
+#   2. bff_idp_net                      : nextjs-bff <-> keycloak ONLY (spring-backend excluded)
+#   3. bff_redis_net                    : nextjs-bff <-> bff-redis ONLY (internal: true in prod)
+#   4. backend_db_net                   : spring-backend <-> app-db ONLY (internal: true in prod)
+#   5. bff_backend_net (internal: true) : nextjs-bff <-> spring-backend ONLY
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # 1. Dedicated Keycloak PostgreSQL 16 Database (SEC-IAM-006)
+  # Attached strictly to kc_db_net (internal: true); ZERO host ports exposed.
+  # ---------------------------------------------------------------------------
+  keycloak-db:
+    image: postgres:16.6-alpine
+    container_name: mybooking-keycloak-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${KC_DB_NAME:-keycloak}
+      POSTGRES_USER: ${KC_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${KC_DB_PASS:-dev_only_kc_db_password_change_me}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+    networks:
+      - kc_db_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
+  # 2. Keycloak 26.4.0 OAuth2 / OIDC Identity Provider (ADR-0016)
+  # Attached to kc_db_net + bff_idp_net ONLY (spring-backend is NOT on bff_idp_net).
+  # Local dev binds 127.0.0.1:8180:8080 (avoiding Spring Boot :8080); management
+  # port :9000 is internal-only for container healthcheck (never exposed to host).
+  # ---------------------------------------------------------------------------
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.0
+    container_name: mybooking-keycloak
+    restart: unless-stopped
+    command:
+      - start-dev
+      - --import-realm
+      - --health-enabled=true
+      - --metrics-enabled=true
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://keycloak-db:5432/${KC_DB_NAME:-keycloak}
+      KC_DB_USERNAME: ${KC_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${KC_DB_PASS:-dev_only_kc_db_password_change_me}
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD:-dev_only_kc_admin_password_change_me}
+      KC_HTTP_ENABLED: "true"
+      KC_HEALTH_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+    ports:
+      - "127.0.0.1:${KC_HOST_PORT:-8180}:8080"
+    depends_on:
+      keycloak-db:
+        condition: service_healthy
+    networks:
+      - kc_db_net
+      - bff_idp_net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q 'UP' <&3"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  # ---------------------------------------------------------------------------
+  # 3. BFF Redis 7.4.1 Session Store (ADR-0004 / T-02)
+  # Attached strictly to bff_redis_net. Disk persistence is explicitly disabled
+  # (--save "" --appendonly no) so encrypted session blobs never touch disk.
+  # Enforces scoped Redis ACLs (default user disabled; app user restricted to
+  # ~bff:* keys and denied @admin/@dangerous commands like FLUSHALL/CONFIG/DEBUG).
+  # Note: requirepass/ACL authenticates only; Redis TLS (rediss://) is mandatory
+  # whenever Redis traffic crosses any non-private/shared network boundary.
+  # ---------------------------------------------------------------------------
+  bff-redis:
+    image: redis:7.4.1-alpine
+    container_name: mybooking-bff-redis
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --protected-mode
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD:-dev_only_redis_password_change_me}
+      - --user
+      - ${REDIS_ACL_USER:-bff_app}
+      - "on"
+      - ">${REDIS_PASSWORD:-dev_only_redis_password_change_me}"
+      - "~bff:*"
+      - "&*"
+      - "+@read"
+      - "+@write"
+      - "+@string"
+      - "+@hash"
+      - "+@set"
+      - "+@connection"
+      - "+@transaction"
+      - "+@scripting"
+      - "-@dangerous"
+      - "-@admin"
+      - "-flushall"
+      - "-flushdb"
+      - "-config"
+      - "-debug"
+      - "-shutdown"
+      - "-acl"
+      - "-keys"
+    ports:
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
+    networks:
+      - bff_redis_net
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "redis-cli --user \"${REDIS_ACL_USER:-bff_app}\" --pass \"${REDIS_PASSWORD:-dev_only_redis_password_change_me}\" --no-auth-warning ping | grep -q PONG"
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
+  # 4. Application PostgreSQL 16 Database (app-db)
+  # Attached strictly to backend_db_net (nextjs-bff and keycloak excluded).
+  # Local dev binds 127.0.0.1:5433:5432 to avoid host port 5432 collisions.
+  # ---------------------------------------------------------------------------
+  app-db:
+    image: postgres:16.6-alpine
+    container_name: mybooking-app-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-mybooking}
+      POSTGRES_USER: ${DB_USER:-mybooking}
+      POSTGRES_PASSWORD: ${DB_PASS:-dev_only_app_db_password_change_me}
+    ports:
+      - "127.0.0.1:${DB_HOST_PORT:-5433}:5432"
+    volumes:
+      - app_db_data:/var/lib/postgresql/data
+    networks:
+      - backend_db_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+networks:
+  # 1. Keycloak <-> Keycloak DB (strictly internal; zero external/host routing)
+  kc_db_net:
+    name: mybooking_kc_db_net
+    driver: bridge
+    internal: true
+
+  # 2. Next.js BFF <-> Keycloak (spring-backend excluded)
+  bff_idp_net:
+    name: mybooking_bff_idp_net
+    driver: bridge
+
+  # 3. Next.js BFF <-> BFF Redis (set internal: true in containerized/prod overlay where 127.0.0.1:6379 is omitted)
+  bff_redis_net:
+    name: mybooking_bff_redis_net
+    driver: bridge
+
+  # 4. Spring Boot Backend <-> Application DB (set internal: true in containerized/prod overlay where 127.0.0.1:5433 is omitted)
+  backend_db_net:
+    name: mybooking_backend_db_net
+    driver: bridge
+
+  # 5. Next.js BFF <-> Spring Boot Backend (strictly internal)
+  bff_backend_net:
+    name: mybooking_bff_backend_net
+    driver: bridge
+    internal: true
+
+volumes:
+  keycloak_db_data:
+    name: mybooking_keycloak_db_data
+  app_db_data:
+    name: mybooking_app_db_data

@@ -146,7 +146,7 @@ export default function EmployeeTrainings() {
   }
 
   const getTrainingProgress = (training: EmployeeTrainingAssignment) => {
-    const startDate = new Date(training.assignedDate)
+    const startDate = new Date(training.assignedDate || training.assignedAt)
     const endDate = new Date(training.trainingEndDate)
     const today = new Date()
     
@@ -167,7 +167,7 @@ export default function EmployeeTrainings() {
     const matchesStatus = filterStatus === "all" || training.status === filterStatus
     const matchesSearch = searchTerm === "" || 
       training.trainingTitle.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      training.trainingDescription.toLowerCase().includes(searchTerm.toLowerCase())
+      (training.trainingDescription || "").toLowerCase().includes(searchTerm.toLowerCase())
     
     return matchesStatus && matchesSearch
   })
@@ -276,7 +276,7 @@ export default function EmployeeTrainings() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-4">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        <span>Assigned: {formatDate(training.assignedDate)}</span>
+                        <span>Assigned: {formatDate(training.assignedDate || training.assignedAt)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />

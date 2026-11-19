@@ -275,7 +275,7 @@ export default function MyReservationsPage() {
         <div className="text-center py-16">
           <CalendarIcon className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
           <h3 className="text-xl font-semibold">No reservations found</h3>
-          <p className="text-muted-foreground mt-2">You haven't made any reservations yet. <Link href="/rooms" className="text-primary hover:underline">Browse our rooms</Link> to get started!</p>
+          <p className="text-muted-foreground mt-2">You haven&apos;t made any reservations yet. <Link href="/rooms" className="text-primary hover:underline">Browse our rooms</Link> to get started!</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -301,7 +301,7 @@ export default function MyReservationsPage() {
                 </div>
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <MapPin className="h-4 w-4 text-primary" />
-                  <span>{reservation.installationName}</span>
+                  <span>{(reservation as any).installationName}</span>
                 </div>
                 <div className="flex items-center justify-between pt-2 border-t border-border">
                   <span className="text-muted-foreground">Total Price:</span>
@@ -330,7 +330,7 @@ export default function MyReservationsPage() {
                                     <div className="flex items-center gap-2 mb-1">
                                       <Reply className="h-3 w-3 text-blue-600" />
                                       <span className="font-medium text-blue-800">
-                                        Admin Response {feedback.replies.length > 1 ? `#${index + 1}` : ''}:
+                                        Admin Response {(feedback.replies?.length ?? 0) > 1 ? `#${index + 1}` : ''}:
                                       </span>
                                       <span className="text-xs text-blue-600">
                                         by {reply.adminUserName}

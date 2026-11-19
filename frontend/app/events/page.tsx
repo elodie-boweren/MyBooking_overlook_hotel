@@ -275,7 +275,7 @@ export default function EventsPage() {
                     <div className="space-y-3 text-sm">
                       <div className="flex items-center gap-3 text-muted-foreground">
                         <Clock className="h-4 w-4 text-primary" />
-                        <span>{formatDateTime(event.startAt)}</span>
+                        <span>{formatDateTime(event.startAt || "")}</span>
                       </div>
                       <div className="flex items-center gap-3 text-muted-foreground">
                         <Users className="h-4 w-4 text-primary" />
@@ -317,7 +317,7 @@ export default function EventsPage() {
             setIsBookingModalOpen(false)
             setSelectedEvent(null)
           }}
-          event={selectedEvent}
+          event={selectedEvent as any}
           onBookingSuccess={handleBookingSuccess}
         />
       )}

@@ -1,0 +1,353 @@
+name: PR & Merge Queue CI (Stage A)
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
+    types: [checks_requested]
+
+# Least-privilege read-only GITHUB_TOKEN across all PR and merge_group jobs.
+# Never use pull_request_target; never expose production/staging secrets here.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-pr-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Internal Path & Scope Classifier (CICD-004)
+  # Avoids workflow-level paths: filters so docs/**-only PRs and merge_group
+  # never leave required status checks stuck in "Expected — Waiting".
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Path & Scope Classifier
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.classify.outputs.backend }}
+      db_infra: ${{ steps.classify.outputs.db_infra }}
+      infra_config: ${{ steps.classify.outputs.infra_config }}
+      frontend: ${{ steps.classify.outputs.frontend }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Classify changed paths
+        id: classify
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          elif [ "${{ github.event_name }}" = "merge_group" ]; then
+            BASE_SHA="${{ github.event.merge_group.base_sha }}"
+            HEAD_SHA="${{ github.event.merge_group.head_sha }}"
+          else
+            BASE_SHA="HEAD~1"
+            HEAD_SHA="HEAD"
+          fi
+
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA" "$HEAD_SHA" || true)"
+          echo "Changed files between $BASE_SHA and $HEAD_SHA:"
+          echo "$CHANGED_FILES"
+
+          BACKEND="false"
+          DB_INFRA="false"
+          INFRA_CONFIG="false"
+          FRONTEND="false"
+
+          if echo "$CHANGED_FILES" | grep -Eq '^(backend/|pom\.xml|mvnw|\.mvn/|\.github/workflows/ci-pr\.yml)'; then
+            BACKEND="true"
+          fi
+          if echo "$CHANGED_FILES" | grep -Eq '^(backend/|pom\.xml|mvnw|\.mvn/|infra/|docker-compose|\.github/workflows/ci-pr\.yml)'; then
+            DB_INFRA="true"
+          fi
+          if echo "$CHANGED_FILES" | grep -Eq '^(infra/|docker-compose|\.env\.example|scripts/ci/lint-infra-policy\.sh|(.*/)?Dockerfile|\.github/workflows/ci-pr\.yml)'; then
+            INFRA_CONFIG="true"
+          fi
+          if echo "$CHANGED_FILES" | grep -Eq '^(frontend/|\.github/workflows/ci-pr\.yml)'; then
+            FRONTEND="true"
+          fi
+
+          # On merge_group, always enforce backend, db_infra, infra_config, and frontend if diff is empty
+          if [ -z "$CHANGED_FILES" ] && [ "${{ github.event_name }}" = "merge_group" ]; then
+            BACKEND="true"
+            DB_INFRA="true"
+            INFRA_CONFIG="true"
+            FRONTEND="true"
+          fi
+
+          echo "backend=$BACKEND" >> "$GITHUB_OUTPUT"
+          echo "db_infra=$DB_INFRA" >> "$GITHUB_OUTPUT"
+          echo "infra_config=$INFRA_CONFIG" >> "$GITHUB_OUTPUT"
+          echo "frontend=$FRONTEND" >> "$GITHUB_OUTPUT"
+          echo "Scope classification -> backend=$BACKEND, db_infra=$DB_INFRA, infra_config=$INFRA_CONFIG, frontend=$FRONTEND"
+
+  # ---------------------------------------------------------------------------
+  # 2. Secret Scanning Gate — Gitleaks (CICD-005)
+  # Always runs on every PR and merge_group (including docs/**-only PRs).
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - name: Install and verify Gitleaks v8.21.2
+        run: |
+          set -euo pipefail
+          GITLEAKS_VERSION="8.21.2"
+          GITLEAKS_TAR="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          GITLEAKS_SHA256="5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
+
+          curl --retry 5 --retry-delay 2 --retry-all-errors -sSL -o "/tmp/${GITLEAKS_TAR}" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_TAR}"
+          echo "${GITLEAKS_SHA256}  /tmp/${GITLEAKS_TAR}" | sha256sum -c -
+          tar -xzf "/tmp/${GITLEAKS_TAR}" -C /usr/local/bin gitleaks
+          gitleaks version
+
+      - name: Run Gitleaks on commit range and working tree
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE_SHA="${{ github.event.pull_request.base.sha }}"
+            HEAD_SHA="${{ github.event.pull_request.head.sha }}"
+          elif [ "${{ github.event_name }}" = "merge_group" ]; then
+            BASE_SHA="${{ github.event.merge_group.base_sha }}"
+            HEAD_SHA="${{ github.event.merge_group.head_sha }}"
+          else
+            BASE_SHA="HEAD~1"
+            HEAD_SHA="HEAD"
+          fi
+
+          gitleaks git . --log-opts="${BASE_SHA}..${HEAD_SHA}" --redact --verbose --exit-code 1
+          gitleaks dir . --redact --verbose --exit-code 1
+
+  # ---------------------------------------------------------------------------
+  # 3. Backend Fast Gate — Compile & Surefire (*Test) Unit/Slice Tests (CICD-005)
+  # ---------------------------------------------------------------------------
+  backend-fast:
+    name: Backend Fast (Surefire *Test)
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.backend == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Java 17
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Bootstrap Maven Wrapper (with retry)
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if MVNW_VERBOSE=true ./mvnw -B --version; then
+              break
+            fi
+            echo "Maven Wrapper download attempt ${attempt} failed; retrying in $((attempt * 3))s..."
+            sleep $((attempt * 3))
+          done
+          ./mvnw -B --version
+
+      - name: Run Maven Surefire unit and slice tests (*Test)
+        run: ./mvnw -B test
+
+  # ---------------------------------------------------------------------------
+  # 4. Backend PostgreSQL 16 Migration & Integration Gate (*IT) (CICD-006)
+  # Fails closed if Docker is unavailable or if zero *IT tests match.
+  # ---------------------------------------------------------------------------
+  backend-pg-migration:
+    name: Backend PG16 Migration & Failsafe (*IT)
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.db_infra == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Java 17
+        uses: actions/setup-java@3a4f6e1af504cf6a31855fa899c6aa5355ba6c12 # v4.7.0
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Verify Docker daemon availability (fail-closed)
+        run: |
+          set -euo pipefail
+          docker info > /dev/null
+          docker --version
+
+      - name: Bootstrap Maven Wrapper (with retry)
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if MVNW_VERBOSE=true ./mvnw -B --version; then
+              break
+            fi
+            echo "Maven Wrapper download attempt ${attempt} failed; retrying in $((attempt * 3))s..."
+            sleep $((attempt * 3))
+          done
+          ./mvnw -B --version
+
+      - name: Compile backend test classes
+        run: ./mvnw -B -pl backend test-compile
+
+      - name: Prove Failsafe fails closed when zero *IT tests match
+        run: |
+          set -euo pipefail
+          if ./mvnw -B -pl backend failsafe:integration-test failsafe:verify -Dit.test=NonExistentIT; then
+            echo "ERROR: Maven Failsafe did not fail when zero *IT tests matched!"
+            exit 1
+          fi
+          echo "Verified: Failsafe failed closed on zero matching *IT tests."
+
+      - name: Run Failsafe integration & PostgreSQL 16.6-alpine V1-V8 migration tests (*IT)
+        run: ./mvnw -B -pl backend failsafe:integration-test failsafe:verify
+
+  # ---------------------------------------------------------------------------
+  # 5. Frontend Fast Gate — Typecheck, ESLint & Next.js Build (CICD-005)
+  # ---------------------------------------------------------------------------
+  frontend-fast:
+    name: Frontend Fast (tsc, lint, build)
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.frontend == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4.2.0
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies (frozen lockfile)
+        run: npm --prefix frontend ci
+
+      - name: Run TypeScript typecheck
+        run: npm --prefix frontend run typecheck
+
+      - name: Run ESLint
+        run: npm --prefix frontend run lint
+
+      - name: Run Next.js production build
+        run: npm --prefix frontend run build
+
+  # ---------------------------------------------------------------------------
+  # 6. Static Container/Compose, 5-Network Isolation & Keycloak Realm Lint (CICD-010)
+  # Runs whenever infra/**, docker-compose.yml, .env.example, Dockerfiles, or
+  # ci-pr.yml change. Enforces 5-network isolation, Redis persistence disablement
+  # (--save "" --appendonly no), and Keycloak mybooking realm security invariants.
+  # ---------------------------------------------------------------------------
+  container-config-lint:
+    name: Container, Compose & Realm Policy Lint
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.infra_config == 'true'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Run Compose, 5-Network, Redis & Keycloak Realm Policy Linter (+ Negative Self-Tests)
+        run: ./scripts/ci/lint-infra-policy.sh --run-self-tests
+
+      - name: Run Hadolint on any Dockerfiles (if present)
+        run: |
+          set -euo pipefail
+          DOCKERFILES="$(find . -maxdepth 3 -name 'Dockerfile*' -not -path './node_modules/*' -not -path './frontend/node_modules/*' || true)"
+          if [ -n "$DOCKERFILES" ]; then
+            echo "Linting Dockerfiles with Hadolint:"
+            echo "$DOCKERFILES"
+            for df in $DOCKERFILES; do
+              docker run --rm -i ghcr.io/hadolint/hadolint:v2.12.0 < "$df"
+            done
+          else
+            echo "No Dockerfiles present in repository yet; skipping Hadolint step."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # 7. Single Stable Required Status Check (CICD-004 / CICD-010)
+  # Always runs; passes ONLY if every applicable job succeeded and non-applicable
+  # jobs were legitimately skipped.
+  # ---------------------------------------------------------------------------
+  ci-required-gate:
+    name: ci-required-gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - changes
+      - secret-scan
+      - backend-fast
+      - backend-pg-migration
+      - frontend-fast
+      - container-config-lint
+    steps:
+      - name: Evaluate Stage A required gates (fail-closed)
+        run: |
+          set -euo pipefail
+
+          CHANGES_RES="${{ needs.changes.result }}"
+          SECRET_RES="${{ needs.secret-scan.result }}"
+          BACKEND_SCOPE="${{ needs.changes.outputs.backend }}"
+          BACKEND_RES="${{ needs.backend-fast.result }}"
+          DB_SCOPE="${{ needs.changes.outputs.db_infra }}"
+          DB_RES="${{ needs.backend-pg-migration.result }}"
+          INFRA_SCOPE="${{ needs.changes.outputs.infra_config }}"
+          INFRA_RES="${{ needs.container-config-lint.result }}"
+          FRONTEND_SCOPE="${{ needs.changes.outputs.frontend }}"
+          FRONTEND_RES="${{ needs.frontend-fast.result }}"
+
+          echo "Gate evaluation inputs:"
+          echo "  changes               : result=${CHANGES_RES}"
+          echo "  secret-scan           : result=${SECRET_RES} (always required)"
+          echo "  backend-fast          : scope=${BACKEND_SCOPE}, result=${BACKEND_RES}"
+          echo "  backend-pg-migration  : scope=${DB_SCOPE}, result=${DB_RES}"
+          echo "  container-config-lint : scope=${INFRA_SCOPE}, result=${INFRA_RES}"
+          echo "  frontend-fast         : scope=${FRONTEND_SCOPE}, result=${FRONTEND_RES}"
+
+          if [ "$CHANGES_RES" != "success" ]; then
+            echo "FAIL: Path classifier job did not succeed (${CHANGES_RES})."
+            exit 1
+          fi
+
+          if [ "$SECRET_RES" != "success" ]; then
+            echo "FAIL: Mandatory secret-scan job did not succeed (${SECRET_RES})."
+            exit 1
+          fi
+
+          check_scoped_job() {
+            local job_name="$1"
+            local scope="$2"
+            local result="$3"
+            if [ "$scope" = "true" ]; then
+              if [ "$result" != "success" ]; then
+                echo "FAIL: Applicable job '${job_name}' (scope=true) did not succeed (result=${result})."
+                exit 1
+              fi
+            else
+              if [ "$result" != "skipped" ] && [ "$result" != "success" ]; then
+                echo "FAIL: Non-applicable job '${job_name}' (scope=false) ended in unexpected state (result=${result})."
+                exit 1
+              fi
+            fi
+          }
+
+          check_scoped_job "backend-fast" "$BACKEND_SCOPE" "$BACKEND_RES"
+          check_scoped_job "backend-pg-migration" "$DB_SCOPE" "$DB_RES"
+          check_scoped_job "container-config-lint" "$INFRA_SCOPE" "$INFRA_RES"
+          check_scoped_job "frontend-fast" "$FRONTEND_SCOPE" "$FRONTEND_RES"
+
+          echo "PASS: All applicable Stage A gates succeeded and non-applicable gates were legitimately skipped."

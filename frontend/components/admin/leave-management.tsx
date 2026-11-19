@@ -262,16 +262,16 @@ export default function AdminLeaveManagement() {
                       <div className="flex items-center gap-6 text-sm text-muted-foreground">
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
-                          <span>From: {new Date(request.fromDate).toLocaleDateString()}</span>
+                          <span>From: {new Date(request.fromDate || request.startDate).toLocaleDateString()}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Calendar className="h-4 w-4" />
-                          <span>To: {new Date(request.toDate).toLocaleDateString()}</span>
+                          <span>To: {new Date(request.toDate || request.endDate).toLocaleDateString()}</span>
                         </div>
                         <div className="flex items-center gap-1">
                           <Clock className="h-4 w-4" />
                           <span>
-                            {Math.ceil((new Date(request.toDate).getTime() - new Date(request.fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} days
+                            {Math.ceil((new Date(request.toDate || request.endDate).getTime() - new Date(request.fromDate || request.startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1} days
                           </span>
                         </div>
                       </div>

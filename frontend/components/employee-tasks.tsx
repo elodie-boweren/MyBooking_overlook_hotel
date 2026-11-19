@@ -159,7 +159,7 @@ export default function EmployeeTasks() {
     const matchesSearch = searchTerm === "" || 
       task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       task.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      task.assignedToName.toLowerCase().includes(searchTerm.toLowerCase())
+      (task.assignedToName || "").toLowerCase().includes(searchTerm.toLowerCase())
     
     return matchesStatus && matchesSearch
   })
@@ -245,7 +245,7 @@ export default function EmployeeTasks() {
                         {getStatusIcon(task.status)}
                         <span className="ml-1">{task.status.replace('_', ' ')}</span>
                       </Badge>
-                      <Badge className={getPriorityColor(task.priority)}>
+                      <Badge className={getPriorityColor(task.priority || "")}>
                         {task.priority}
                       </Badge>
                     </div>
@@ -255,7 +255,7 @@ export default function EmployeeTasks() {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600 mb-4">
                       <div className="flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
-                        <span>Due: {formatDate(task.dueDate)}</span>
+                        <span>Due: {formatDate(task.dueDate || "")}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <User className="h-4 w-4" />

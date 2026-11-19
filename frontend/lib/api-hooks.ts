@@ -10,18 +10,24 @@ import {
   ApiError,
   type User,
   type Room,
-  type Booking,
-  type DashboardStats,
-  type CreateBookingRequest,
+  type Reservation,
+  type DashboardData,
+  type CreateReservationRequest,
   type CreateRoomRequest,
-  type CreateUserRequest,
   type LoginRequest,
+  type LoginResponse,
   type RegisterRequest,
-  type AuthResponse,
 } from "./api"
 
+type Booking = Reservation
+type DashboardStats = DashboardData
+type CreateBookingRequest = CreateReservationRequest
+type CreateUserRequest = RegisterRequest
+type AuthResponse = LoginResponse & { refreshToken?: string; user?: User }
+const ENDPOINTS = API_ENDPOINTS as Record<string, any>
+
 // Generic fetcher function for SWR
-const fetcher = (url: string) => apiClient.get(url)
+const fetcher = <T = any>(url: string): Promise<T> => apiClient.get<T>(url)
 
 // Authentication hooks
 export function useAuth() {
@@ -38,8 +44,8 @@ export function useAuth() {
       // Store tokens and user data
       if (typeof window !== "undefined") {
         localStorage.setItem("token", response.token)
-        localStorage.setItem("refreshToken", response.refreshToken)
-        localStorage.setItem("user", JSON.stringify(response.user))
+        if (response.refreshToken) localStorage.setItem("refreshToken", response.refreshToken)
+        if (response.user) localStorage.setItem("user", JSON.stringify(response.user))
       }
 
       return response
@@ -70,7 +76,7 @@ export function useAuth() {
 
   const logout = async () => {
     try {
-      await apiClient.post(API_ENDPOINTS.AUTH.LOGOUT)
+      await apiClient.post(ENDPOINTS.AUTH.LOGOUT)
     } catch (err) {
       // Continue with logout even if API call fails
       console.error("Logout API call failed:", err)
@@ -119,7 +125,7 @@ export function useCreateRoom() {
     setError(null)
 
     try {
-      const response = await apiClient.post<Room>(API_ENDPOINTS.ROOMS.CREATE, roomData)
+      const response = await apiClient.post<Room>(ENDPOINTS.ROOMS.CREATE, roomData)
       return response
     } catch (err) {
       const errorMessage = err instanceof ApiError ? err.message : "Failed to create room"
@@ -135,12 +141,12 @@ export function useCreateRoom() {
 
 // Booking hooks
 export function useBookings(userId?: string, roomId?: string) {
-  let endpoint = API_ENDPOINTS.BOOKINGS.LIST
+  let endpoint = ENDPOINTS.BOOKINGS.LIST
 
   if (userId) {
-    endpoint = API_ENDPOINTS.BOOKINGS.USER_BOOKINGS(userId)
+    endpoint = ENDPOINTS.BOOKINGS.USER_BOOKINGS(userId)
   } else if (roomId) {
-    endpoint = API_ENDPOINTS.BOOKINGS.ROOM_BOOKINGS(roomId)
+    endpoint = ENDPOINTS.BOOKINGS.ROOM_BOOKINGS(roomId)
   }
 
   const { data, error, mutate } = useSWR<Booking[]>(endpoint, fetcher)
@@ -162,7 +168,7 @@ export function useCreateBooking() {
     setError(null)
 
     try {
-      const response = await apiClient.post<Booking>(API_ENDPOINTS.BOOKINGS.CREATE, bookingData)
+      const response = await apiClient.post<Booking>(ENDPOINTS.BOOKINGS.CREATE, bookingData)
       return response
     } catch (err) {
       const errorMessage = err instanceof ApiError ? err.message : "Failed to create booking"
@@ -178,7 +184,7 @@ export function useCreateBooking() {
 
 // Admin hooks
 export function useDashboardStats() {
-  const { data, error, mutate } = useSWR<DashboardStats>(API_ENDPOINTS.ADMIN.STATS, fetcher)
+  const { data, error, mutate } = useSWR<DashboardStats>(ENDPOINTS.ADMIN.STATS, fetcher)
 
   return {
     stats: data,
@@ -189,7 +195,7 @@ export function useDashboardStats() {
 }
 
 export function useUsers() {
-  const { data, error, mutate } = useSWR<User[]>(API_ENDPOINTS.USERS.LIST, fetcher)
+  const { data, error, mutate } = useSWR<User[]>(ENDPOINTS.USERS.LIST, fetcher)
 
   return {
     users: data,
@@ -208,7 +214,7 @@ export function useCreateUser() {
     setError(null)
 
     try {
-      const response = await apiClient.post<User>(API_ENDPOINTS.USERS.CREATE, userData)
+      const response = await apiClient.post<User>(ENDPOINTS.USERS.CREATE, userData)
       return response
     } catch (err) {
       const errorMessage = err instanceof ApiError ? err.message : "Failed to create user"

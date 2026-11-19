@@ -138,7 +138,7 @@ export default function EnhancedEmployeeCalendar() {
 
     setEvents((prev) =>
       prev.map((event) =>
-        event.id === selectedEvent.id ? { ...event, replies: [...(event.replies || []), newReply] } : event,
+        event.id === selectedEvent.id ? { ...event, replies: [...(event.replies || []), newReply as any] } : event,
       ),
     )
 
@@ -150,7 +150,7 @@ export default function EnhancedEmployeeCalendar() {
       prev
         ? {
             ...prev,
-            replies: [...(prev.replies || []), newReply],
+            replies: [...(prev.replies || []), newReply as any],
           }
         : null,
     )
@@ -499,7 +499,7 @@ export default function EnhancedEmployeeCalendar() {
                                     className="flex items-center gap-1 bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs"
                                   >
                                     <Paperclip className="h-3 w-3" />
-                                    {attachment}
+                                    {typeof attachment === 'string' ? attachment : attachment.name}
                                   </div>
                                 ))}
                               </div>

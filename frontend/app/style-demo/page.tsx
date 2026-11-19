@@ -203,7 +203,7 @@ export default function StyleDemoPage() {
             <CardHeader>
               <CardTitle>Color Reference</CardTitle>
               <p className="text-sm text-muted-foreground">
-                Your frontend's actual color scheme
+                Your frontend&apos;s actual color scheme
               </p>
             </CardHeader>
             <CardContent>

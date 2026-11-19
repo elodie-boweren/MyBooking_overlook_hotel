@@ -97,9 +97,9 @@ jobs:
           set -euo pipefail
           GITLEAKS_VERSION="8.21.2"
           GITLEAKS_TAR="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-          GITLEAKS_SHA256="2dcb56fb2976ca1ca52fd7ad2cae47fb4cae2ffcb2eb3fa0bc3fe6ac3bfcb1fb"
+          GITLEAKS_SHA256="5bc41815076e6ed6ef8fbecc9d9b75bcae31f39029ceb55da08086315316e3ba"
 
-          curl -sSL -o "/tmp/${GITLEAKS_TAR}" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_TAR}"
+          curl --retry 5 --retry-delay 2 --retry-all-errors -sSL -o "/tmp/${GITLEAKS_TAR}" "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${GITLEAKS_TAR}"
           echo "${GITLEAKS_SHA256}  /tmp/${GITLEAKS_TAR}" | sha256sum -c -
           tar -xzf "/tmp/${GITLEAKS_TAR}" -C /usr/local/bin gitleaks
           gitleaks version
@@ -140,6 +140,18 @@ jobs:
           java-version: '17'
           cache: maven
 
+      - name: Bootstrap Maven Wrapper (with retry)
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if MVNW_VERBOSE=true ./mvnw -B --version; then
+              break
+            fi
+            echo "Maven Wrapper download attempt ${attempt} failed; retrying in $((attempt * 3))s..."
+            sleep $((attempt * 3))
+          done
+          ./mvnw -B --version
+
       - name: Run Maven Surefire unit and slice tests (*Test)
         run: ./mvnw -B test
 
@@ -168,6 +180,18 @@ jobs:
           set -euo pipefail
           docker info > /dev/null
           docker --version
+
+      - name: Bootstrap Maven Wrapper (with retry)
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if MVNW_VERBOSE=true ./mvnw -B --version; then
+              break
+            fi
+            echo "Maven Wrapper download attempt ${attempt} failed; retrying in $((attempt * 3))s..."
+            sleep $((attempt * 3))
+          done
+          ./mvnw -B --version
 
       - name: Compile backend test classes
         run: ./mvnw -B -pl backend test-compile

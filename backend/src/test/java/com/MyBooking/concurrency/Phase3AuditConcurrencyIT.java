@@ -56,7 +56,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class Phase3AuditConcurrencyIT {
 
     @Container
-    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine")
+    static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16.6-alpine")
             .withDatabaseName("mybooking_test")
             .withUsername("test")
             .withPassword("test");
